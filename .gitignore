@@ -4,7 +4,8 @@ codes.txt
 __pycache__/
 *.py[codz]
 *$py.class
-
+.stubs
+*.stub-info
 # C extensions
 *.so
 
