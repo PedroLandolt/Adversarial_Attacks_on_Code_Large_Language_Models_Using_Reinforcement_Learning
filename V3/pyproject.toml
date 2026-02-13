@@ -1,0 +1,6 @@
+[project]
+name = "v3"
+version = "0.1.0"
+
+[tool.setuptools]
+packages = ["attacks", "tasks", "config", "utils"]
