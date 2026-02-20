@@ -1,11 +1,14 @@
-inspect eval V3/tasks/mbpp_attack.py@mbpp_attack \
-  --model google/gemini-flash-latest \
-  -T temperature=0.0 \
-  --limit 10
+# Baseline test (no mutations)
+inspect eval \
+  V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen2.5:7b \
+  --limit 5
 
-
-inspect eval V3/tasks/mbpp_attack.py@mbpp_attack \
-  --model google/gemini-flash-latest \
-  -T temperature=0.0 \
+# Full attack (misleading comments + variable renaming)
+inspect eval \
+  V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen2.5:7b \
+  -T max_iterations=5 \
   -T use_misleading_comments=True \
+  -T use_variable_renaming=True \
   --limit 10

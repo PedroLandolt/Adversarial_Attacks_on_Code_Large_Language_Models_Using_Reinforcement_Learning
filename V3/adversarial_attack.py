@@ -1,5 +1,3 @@
-# V3/tasks/mbpp_attack.py
-
 from inspect_ai import Task, task
 from inspect_ai.solver import generate
 from inspect_evals.mbpp import mbpp
@@ -8,7 +6,7 @@ from attacks.misleading_comments import misleading_comments
 
 
 @task
-def mbpp_attack(
+def adversarial_code_llm(
     temperature: float = 0.5,
     use_misleading_comments: bool = False,
 ) -> Task:
@@ -25,10 +23,12 @@ def mbpp_attack(
 
     solver.append(generate())
 
+    # Don't pass scorer as a list - pass it directly
+    # base_task.scorer should already be the correct scorer object
     return Task(
         dataset=base_task.dataset,
         solver=solver,
-        scorer=base_task.scorer,
+        scorer=base_task.scorer,  # Pass the scorer directly, not in a list
         epochs=base_task.epochs,
         config=base_task.config,
         sandbox=base_task.sandbox,
