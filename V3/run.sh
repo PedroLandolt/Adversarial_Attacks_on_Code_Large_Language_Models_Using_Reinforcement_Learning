@@ -1,4 +1,4 @@
-inspect eval tasks/mbpp_attack.py@mbpp_attack \
+inspect eval V3/tasks/mbpp_attack.py@mbpp_attack \
   --model google/gemini-flash-latest \
   -T temperature=0.0 \
   --limit 10
