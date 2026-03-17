@@ -1,0 +1,14 @@
+services:
+  default:
+    image: python:3.12-slim
+    command: >
+      bash -c "apt-get update -qq && apt-get install -y -qq git curl && tail -f /dev/null"
+    init: true
+    environment:
+      - GITHUB_API_URL
+      - GITHUB_TOKEN
+      - REVIEWER_TOKEN
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
