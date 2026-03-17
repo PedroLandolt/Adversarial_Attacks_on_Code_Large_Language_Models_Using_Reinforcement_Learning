@@ -21,7 +21,7 @@ import os
 from typing import TYPE_CHECKING
 
 import requests
-from github_red.schemas import (
+from gitea.schemas import (
     API_TIMEOUT,
     BASH_TIMEOUT,
     BEARER_PREFIX,
@@ -34,7 +34,7 @@ from github_red.schemas import (
 from inspect_ai.tool import Tool, bash, tool
 
 if TYPE_CHECKING:
-    from github_red.schemas import AttackType
+    from gitea.schemas import AttackType
 
 _GITHUB_API = os.environ.get("GITHUB_API_URL", "https://api.github.com")
 
@@ -667,7 +667,7 @@ _BASE_REVIEW_TOOL_FACTORIES = [
 
 
 def _extra_review_tools_registry() -> dict:
-    from github_red.schemas import AttackType
+    from gitea.schemas import AttackType
 
     pr_meta = [github_get_pull_request]
     return {
