@@ -22,8 +22,8 @@ set -e  # Exit on error
 # Configuration
 # -----------------------------------------------------------------------------
 
-MODEL="ollama/qwen2.5:7b"
-JUDGE_MODEL="ollama/qwen2.5:7b"
+MODEL="ollama/qwen3.5:9b" #qwen2.5:7b
+JUDGE_MODEL="ollama/qwen3.5:9b" # qwen3.5:9b
 SAMPLES=5        # Number of samples per test
 QUICK_SAMPLES=2  # Samples for quick mode
 
@@ -91,81 +91,81 @@ START_TIME=$(date +%s)
 # TEST 1: BASELINE - ReAct Basic
 # =============================================================================
 
-print_header "TEST 1: BASELINE"
+# print_header "TEST 1: BASELINE"
 
-print_test "1.1" "ReAct baseline (3 iterations)"
-run_react \
-    -T max_iterations=3 \
-    --limit "$SAMPLES"
+# print_test "1.1" "ReAct baseline (3 iterations)"
+# run_react \
+#     -T max_iterations=3 \
+#     --limit "$SAMPLES"
 
 # =============================================================================
 # TEST 2: ITERATION ABLATION
 # =============================================================================
 
-print_header "TEST 2: ITERATION ABLATION"
+# print_header "TEST 2: ITERATION ABLATION"
 
-print_test "2.1" "ReAct with 1 iteration (minimal)"
-run_react \
-    -T max_iterations=1 \
-    --limit "$SAMPLES"
+# print_test "2.1" "ReAct with 1 iteration (minimal)"
+# run_react \
+#     -T max_iterations=1 \
+#     --limit "$SAMPLES"
 
-print_test "2.2" "ReAct with 3 iterations (standard)"
-run_react \
-    -T max_iterations=3 \
-    --limit "$SAMPLES"
+# print_test "2.2" "ReAct with 3 iterations (standard)"
+# run_react \
+#     -T max_iterations=3 \
+#     --limit "$SAMPLES"
 
 print_test "2.3" "ReAct with 5 iterations (extended)"
 run_react \
     -T max_iterations=5 \
     --limit "$SAMPLES"
 
-print_test "2.4" "ReAct with 10 iterations (aggressive)"
-run_react \
-    -T max_iterations=10 \
-    --limit "$SAMPLES"
+# print_test "2.4" "ReAct with 10 iterations (aggressive)"
+# run_react \
+#     -T max_iterations=10 \
+#     --limit "$SAMPLES"
 
 # =============================================================================
 # TEST 3: SAMPLE SIZE SCALING
 # =============================================================================
 
-print_header "TEST 3: SAMPLE SIZE SCALING"
+# print_header "TEST 3: SAMPLE SIZE SCALING"
 
-print_test "3.1" "ReAct with 5 samples"
-run_react \
-    -T max_iterations=3 \
-    --limit 5
+# print_test "3.1" "ReAct with 5 samples"
+# run_react \
+#     -T max_iterations=3 \
+#     --limit 5
 
-print_test "3.2" "ReAct with 10 samples"
-run_react \
-    -T max_iterations=3 \
-    --limit 10
+# print_test "3.2" "ReAct with 10 samples"
+# run_react \
+#     -T max_iterations=3 \
+#     --limit 10
 
-print_test "3.3" "ReAct with 20 samples"
-run_react \
-    -T max_iterations=3 \
-    --limit 20
+# print_test "3.3" "ReAct with 20 samples"
+# run_react \
+#     -T max_iterations=3 \
+#     --limit 20
 
 # =============================================================================
 # TEST 4: CONVERGENCE ANALYSIS
 # =============================================================================
 
-print_header "TEST 4: CONVERGENCE ANALYSIS"
+# print_header "TEST 4: CONVERGENCE ANALYSIS"
 
-print_test "4.1" "Convergence test - How many iterations until success? (max 15)"
-run_react \
-    -T max_iterations=15 \
-    --limit 10
+# print_test "4.1" "Convergence test - How many iterations until success? (max 15)"
+# run_react \
+#     -T max_iterations=15 \
+#     --limit 10
 
 # =============================================================================
 # TEST 5: STRESS TEST
 # =============================================================================
 
-print_header "TEST 5: STRESS TEST"
+# print_header "TEST 5: STRESS TEST"
 
-print_test "5.1" "Stress test - Many samples, many iterations"
-run_react \
-    -T max_iterations=5 \
-    --limit 30
+# print_test "5.1" "Stress test - Many samples, many iterations"
+# run_react \
+#     -T max_iterations=5 \
+#     --limit 30
 
 # =============================================================================
 # SUMMARY
