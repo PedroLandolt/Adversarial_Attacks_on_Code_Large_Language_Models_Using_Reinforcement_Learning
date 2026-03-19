@@ -135,18 +135,29 @@ def adversarial_code_llm(
                     }
 
                 async def apply_and_evaluate_tactic(tactic_name: str):
-                    """Apply selected tactic and evaluate judges."""
+                    """Create a fresh attempt, apply tactic, then evaluate judges."""
+                    # Always regenerate from original prompt so each iteration is a fresh attempt.
+                    state.messages = deepcopy(original_messages)
+                    generated_state = await generate_fn(state)
+
+                    if hasattr(generated_state, "output") and generated_state.output:
+                        if hasattr(generated_state.output, "completion"):
+                            generated_code = generated_state.output.completion
+                        else:
+                            generated_code = str(generated_state.output)
+                    else:
+                        generated_code = "[No output generated]"
+
                     attacked = apply_tactic(
-                        current_code,
+                        generated_code,
                         tactic_name,
                         problem_text,
                     )
 
-                    # Red-teaming tactics preserve functionality in current phase.
                     test_result_iter = {
-                        "pass": test_result["pass"],
-                        "stdout": test_result.get("stdout", ""),
-                        "stderr": test_result.get("stderr", ""),
+                        "pass": generated_state.output.pass_pred if hasattr(generated_state.output, "pass_pred") else False,
+                        "stdout": "",
+                        "stderr": "",
                     }
                     next_test_decision = test_judge(test_result_iter)
                     next_llm_decision = await llm_judge_instance.evaluate(
