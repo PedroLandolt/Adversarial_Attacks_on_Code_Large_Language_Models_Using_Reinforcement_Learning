@@ -4,7 +4,6 @@ ReAct tactic selector - chooses which red-teaming tactic to apply based on feedb
 
 from inspect_ai.model import get_model, ChatMessageUser, GenerateConfig
 from enum import Enum
-import asyncio
 import re
 
 
@@ -166,17 +165,17 @@ Choose the tactic most likely to succeed next. You may repeat a tactic if there 
 Respond with ONLY one word from: injection, output, semantic, cot"""
 
         messages = [ChatMessageUser(content=prompt)]
-
-        response = await asyncio.wait_for(
-            self.selector_model.generate(
+        try:
+            response = await self.selector_model.generate(
                 messages,
                 config=GenerateConfig(
                     temperature=0.3,
                     max_tokens=16,
                 ),
-            ),
-            timeout=30,
-        )
+            )
+        except Exception:
+            return self._fallback_tactic_choice(previous_attempts)
+
         raw_response = response.completion if hasattr(response, "completion") else str(response)
         parsed_tactic = self._extract_tactic_choice(raw_response)
         if parsed_tactic is not None:

@@ -10,7 +10,7 @@ from attacks.gitea_redteam_taxonomy import (
     build_taxonomy_attack_message,
     select_taxonomy_tactic,
 )
-from judge.llm_judge import LLMJudge, JudgeDecision
+from judge.llm_judge import LLMJudge
 from judge.test_judge import test_judge
 from judge.red_teaming_tactics import apply_tactic
 from agent.selector_policy import ReactSelectorPolicy, SelectorContext
@@ -31,10 +31,6 @@ import os
 import random
 import re
 from copy import deepcopy
-
-
-REACT_GENERATION_TIMEOUT_SECONDS = 120
-REACT_JUDGE_TIMEOUT_SECONDS = 90
 
 
 @task
@@ -91,21 +87,12 @@ def adversarial_code_llm(
             problem_text = str(state.messages[0].content) if state.messages else state.input_text
 
             # === BASELINE ===
-            baseline_timeout_recovered = False
             baseline_output = None
-            test_result = {
-                "pass": False,
-                "stdout": "",
-                "stderr": "",
-            }
-            test_decision = test_judge(test_result)
+            test_decision = None
             llm_decision = None
 
             try:
-                baseline_response = await asyncio.wait_for(
-                    generate_fn(state),
-                    timeout=REACT_GENERATION_TIMEOUT_SECONDS,
-                )
+                baseline_response = await generate_fn(state)
 
                 if hasattr(baseline_response, 'output'):
                     if hasattr(baseline_response.output, 'completion'):
@@ -125,34 +112,14 @@ def adversarial_code_llm(
 
                 # Baseline LLM judge
                 if use_llm_judge:
-                    llm_decision = await asyncio.wait_for(
-                        llm_judge_instance.evaluate(
-                            problem_text,
-                            baseline_output,
-                            test_result,
-                        ),
-                        timeout=REACT_JUDGE_TIMEOUT_SECONDS,
+                    llm_decision = await llm_judge_instance.evaluate(
+                        problem_text,
+                        baseline_output,
+                        test_result,
                     )
 
-            except asyncio.TimeoutError:
-                # Keep the run bounded and continue into ReAct with fallback context.
-                baseline_timeout_recovered = True
-                baseline_output = "[Baseline generation timed out]"
-                test_result = {
-                    "pass": False,
-                    "stdout": "",
-                    "stderr": "baseline_generation_timeout",
-                }
-                test_decision = test_judge(test_result)
-                if use_llm_judge:
-                    llm_decision = JudgeDecision(
-                        decision="FAIL",
-                        confidence=0.0,
-                        reasoning="Baseline generation timed out; using fallback context.",
-                        vulnerability="timeout",
-                    )
-
-            except TimeoutError as e:
+            except Exception as e:
+                error_text = str(e).strip() or f"{type(e).__name__} with empty message"
                 attempts.append({
                     "iteration": 0,
                     "mutation": "baseline",
@@ -161,8 +128,8 @@ def adversarial_code_llm(
                     "response": None,
                     "attack_message": None,
                     "attack_success": False,
-                    "stop_reason": "baseline_timeout",
-                    "error": str(e),
+                    "stop_reason": "baseline_error",
+                    "error": error_text,
                 })
 
                 state.metadata = {
@@ -170,7 +137,7 @@ def adversarial_code_llm(
                     "baseline_output": None,
                     "attack_succeeded": False,
                     "total_iterations": 0,
-                    "stop_reason": "baseline_timeout",
+                    "stop_reason": "baseline_error",
                     "all_attempts": attempts,
                     "use_llm_judge": use_llm_judge,
                     "judge_model": judge_model,
@@ -179,26 +146,27 @@ def adversarial_code_llm(
                 }
                 return state
 
-            attempts.append({
-                "iteration": 0,
-                "mutation": "baseline",
-                "tactic": None,
-                "prompt": problem_text,
-                "response": baseline_output,
-                "attack_message": baseline_output,
-                "stop_reason": "baseline_timeout_recovered" if baseline_timeout_recovered else None,
-                "test_judge": {
-                    "decision": test_decision.decision,
-                    "confidence": test_decision.confidence,
-                },
-                "llm_judge": {
-                    "decision": llm_decision.decision if llm_decision else None,
-                    "confidence": llm_decision.confidence if llm_decision else None,
-                    "reasoning": llm_decision.reasoning if llm_decision else None,
-                    "vulnerability": llm_decision.vulnerability if llm_decision else None,
-                } if use_llm_judge else None,
-                "attack_success": False,
-            })
+            # If baseline succeeded, record it
+            if test_decision is not None:
+                attempts.append({
+                    "iteration": 0,
+                    "mutation": "baseline",
+                    "tactic": None,
+                    "prompt": problem_text,
+                    "response": baseline_output,
+                    "attack_message": baseline_output,
+                    "test_judge": {
+                        "decision": test_decision.decision,
+                        "confidence": test_decision.confidence,
+                    },
+                    "llm_judge": {
+                        "decision": llm_decision.decision if llm_decision else None,
+                        "confidence": llm_decision.confidence if llm_decision else None,
+                        "reasoning": llm_decision.reasoning if llm_decision else None,
+                        "vulnerability": llm_decision.vulnerability if llm_decision else None,
+                    } if use_llm_judge else None,
+                    "attack_success": False,
+                })
 
             # === REACT LOOP ===
             if mutation_strategy == "react" and use_llm_judge and selector_policy:
@@ -332,10 +300,7 @@ def adversarial_code_llm(
 
                     # Always regenerate from original prompt so each iteration is a fresh attempt.
                     state.messages = deepcopy(original_messages)
-                    generated_state = await asyncio.wait_for(
-                        generate_fn(state),
-                        timeout=REACT_GENERATION_TIMEOUT_SECONDS,
-                    )
+                    generated_state = await generate_fn(state)
 
                     if hasattr(generated_state, "output") and generated_state.output:
                         if hasattr(generated_state.output, "completion"):
@@ -364,13 +329,10 @@ def adversarial_code_llm(
                         "stderr": "",
                     }
                     next_test_decision = test_judge(test_result_iter)
-                    next_llm_decision = await asyncio.wait_for(
-                        llm_judge_instance.evaluate(
-                            problem_text,
-                            attacked,
-                            test_result_iter,
-                        ),
-                        timeout=REACT_JUDGE_TIMEOUT_SECONDS,
+                    next_llm_decision = await llm_judge_instance.evaluate(
+                        problem_text,
+                        attacked,
+                        test_result_iter,
                     )
                     succeeded = (
                         next_test_decision.decision == "FAIL"
@@ -390,6 +352,7 @@ def adversarial_code_llm(
                     test_decision_obj=None,
                     llm_decision_obj=None,
                     error: str | None = None,
+                    stop_reason: str | None = None,
                 ) -> dict:
                     """Build per-iteration metadata record for ReAct strategy."""
                     record = {
@@ -411,7 +374,7 @@ def adversarial_code_llm(
 
                     if error is not None:
                         record["error"] = error
-                        record["stop_reason"] = "iteration_error"
+                        record["stop_reason"] = stop_reason or "iteration_error"
                         return record
 
                     record["test_judge"] = {
@@ -578,6 +541,10 @@ def adversarial_code_llm(
                         last_llm_result = llm_decision
                         
                     except Exception as e:
+                        error_text = str(e).strip()
+                        error_text = error_text or f"{type(e).__name__} with empty message"
+                        iteration_stop_reason = "iteration_error"
+
                         attempts.append(
                             build_react_attempt_record(
                                 iteration=iteration,
@@ -587,7 +554,8 @@ def adversarial_code_llm(
                                 attacked_code=ctx["attacked_code"],
                                 attack_success=False,
                                 trace=build_iteration_trace(ctx),
-                                error=str(e),
+                                error=error_text,
+                                stop_reason=iteration_stop_reason,
                             )
                         )
 
@@ -959,6 +927,10 @@ def adversarial_gitea_react_attack(
                         break
 
                 except Exception as e:
+                    error_text = str(e).strip()
+                    error_text = error_text or f"{type(e).__name__} with empty message"
+                    iteration_stop_reason = "iteration_error"
+
                     attempts.append(
                         {
                             "iteration": iteration,
@@ -966,11 +938,11 @@ def adversarial_gitea_react_attack(
                             "selected_tactic": ctx.get("selected_tactic_family"),
                             "taxonomy_category": ctx.get("taxonomy_category"),
                             "taxonomy_tactic": ctx.get("taxonomy_tactic"),
-                            "error": str(e),
+                            "error": error_text,
                             "trace": {
                                 "tool_outputs": ctx.get("tool_outputs", {}),
                             },
-                            "stop_reason": "iteration_error",
+                            "stop_reason": iteration_stop_reason,
                         }
                     )
 

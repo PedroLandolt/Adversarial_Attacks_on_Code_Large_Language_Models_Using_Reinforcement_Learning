@@ -844,7 +844,7 @@ Stop after completion.
 
 ---
 
-### [ ] Task 14 — Prepare the Codebase for Future RL / Bandit Selector Work
+### [x] Task 14 — Prepare the Codebase for Future RL / Bandit Selector Work
 **Goal:** only after stabilization, ensure the selector boundary is truly swappable.
 
 **Delivery:**
