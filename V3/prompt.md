@@ -594,7 +594,7 @@ Follow this checklist in order. Do not skip ahead.
 
 ## Task Checklist (Mark each task as [x] only after approval)
 
-### [ ] Task 1 — Correct the Iterative ReAct Flow Around Fresh Attack Attempts
+### [x] Task 1 — Correct the Iterative ReAct Flow Around Fresh Attack Attempts
 **Goal:** fix the conceptual loop so the selected tactic family influences a fresh attack attempt inside the iterative evaluation cycle.
 
 **Delivery:**
@@ -618,7 +618,7 @@ Stop after completion.
 
 ---
 
-### [ ] Task 2 — Fix Tactic Family Tracking and Recorded History Consistency
+### [x] Task 2 — Fix Tactic Family Tracking and Recorded History Consistency
 **Goal:** ensure that the chosen tactic family, the applied tactic family, and the recorded tactic family always match.
 
 **Delivery:**
@@ -638,7 +638,7 @@ Stop after completion.
 
 ---
 
-### [ ] Task 3 — Validate and Harden Stop Conditions
+### [x] Task 3 — Validate and Harden Stop Conditions
 **Goal:** ensure the iterative attack loop cannot run indefinitely and stops for the right reasons.
 
 **Delivery:**
@@ -658,7 +658,7 @@ Stop after completion.
 
 ---
 
-### [ ] Task 4 — Ensure Feedback and Metrics Truly Drive Tactic Family Choice
+### [x] Task 4 — Ensure Feedback and Metrics Truly Drive Tactic Family Choice
 **Goal:** confirm that tactic-family selection depends on prior attempt outcome rather than behaving randomly, statically, or on shallow context alone.
 
 **Delivery:**
@@ -677,7 +677,7 @@ Stop after completion.
 
 ---
 
-### [ ] Task 5 — Introduce Dynamic Per-Attempt Attack Generation Within Tactic Families
+### [x] Task 5 — Introduce Dynamic Per-Attempt Attack Generation Within Tactic Families
 **Goal:** move from static per-tactic payloads to dynamic attack-message generation inside each tactic family.
 
 **Delivery:**
@@ -696,7 +696,7 @@ Stop after completion.
 
 ---
 
-### [ ] Task 6 — Clarify Loop Decomposition Into Explicit Agent Steps
+### [x] Task 6 — Clarify Loop Decomposition Into Explicit Agent Steps
 **Goal:** make the iterative process more understandable and inspectable by decomposing what the agent does at each step.
 
 **Delivery:**
@@ -714,7 +714,7 @@ Stop after completion.
 
 ---
 
-### [ ] Task 7 — Validate Attempt-Level Metadata Integrity
+### [x] Task 7 — Validate Attempt-Level Metadata Integrity
 **Goal:** ensure attempt-level metadata can reconstruct what actually happened in each iteration.
 
 **Delivery:**
@@ -732,7 +732,7 @@ Stop after completion.
 
 ---
 
-### [ ] Task 8 — Improve Observability and Per-Step Trace Detail
+### [x] Task 8 — Improve Observability and Per-Step Trace Detail
 **Goal:** make the system more inspectable for thesis analysis and trajectory viewing.
 
 **Delivery:**
@@ -752,7 +752,7 @@ Stop after completion.
 
 ---
 
-### [ ] Task 9 — Minimal Refactor for Separation of Concerns
+### [x] Task 9 — Minimal Refactor for Separation of Concerns
 **Goal:** improve maintainability only where necessary for correctness, observability, and future RL compatibility.
 
 **Delivery:**
@@ -770,7 +770,7 @@ Stop after completion.
 
 ---
 
-### [ ] Task 10 — Update Technical Documentation for the Stabilized Current System
+### [x] Task 10 — Update Technical Documentation for the Stabilized Current System
 **Goal:** document the system as it actually works after stabilization.
 
 **Delivery:**
@@ -791,7 +791,7 @@ Stop after completion.
 
 ---
 
-### [ ] Task 11 — Improve Model Backend Readiness Through LiteLLM
+### [x] Task 11 — Improve Model Backend Readiness Through LiteLLM
 **Goal:** make the system more practical for stronger non-Ollama model backends while preserving architecture.
 
 **Delivery:**
@@ -809,7 +809,7 @@ Stop after completion.
 
 ---
 
-### [ ] Task 12 — Explore Tool-Based Agent Pattern in a Controlled Way
+### [x] Task 12 — Explore Tool-Based Agent Pattern in a Controlled Way
 **Goal:** explore whether constrained tool patterns such as `decompose` / `submit` fit the architecture.
 
 **Delivery:**
@@ -826,7 +826,7 @@ Stop after completion.
 
 ---
 
-### [ ] Task 13 — Prepare the Codebase for PR / CI Style Target Realism
+### [x] Task 13 — Prepare the Codebase for PR / CI Style Target Realism
 **Goal:** make the design more compatible with future realistic reviewer-agent targets without derailing the current benchmark path.
 
 **Delivery:**
