@@ -7,6 +7,24 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Load environment variables from .env if present
+ENV_FILE=""
+if [[ -f "$PROJECT_ROOT/.env" ]]; then
+    ENV_FILE="$PROJECT_ROOT/.env"
+elif [[ -f "$PROJECT_ROOT/V3/.env" ]]; then
+    ENV_FILE="$PROJECT_ROOT/V3/.env"
+fi
+
+if [[ -n "$ENV_FILE" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
+fi
+
 MODEL="${MODEL:-ollama/qwen3.5:9b}"
 JUDGE_MODEL="${JUDGE_MODEL:-$MODEL}"
 SELECTOR_MODEL="${SELECTOR_MODEL:-$JUDGE_MODEL}"

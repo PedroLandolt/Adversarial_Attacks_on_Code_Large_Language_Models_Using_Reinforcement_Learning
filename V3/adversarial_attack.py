@@ -1,6 +1,7 @@
 from inspect_ai import Task, task
 from inspect_ai.solver import solver, TaskState, generate
 from inspect_ai.model import ChatMessageUser
+from inspect_ai.util import sandbox
 from inspect_evals.mbpp import mbpp
 
 from attacks.misleading_comments import misleading_comments
@@ -105,6 +106,55 @@ def adversarial_code_llm(
             # Extract problem
             problem_text = str(state.messages[0].content) if state.messages else state.input_text
 
+            def extract_mbpp_tests(task_state: TaskState) -> list[str]:
+                metadata = getattr(task_state, "metadata", {}) or {}
+                test_list = metadata.get("test_list")
+                if isinstance(test_list, list) and test_list:
+                    return [str(test_case) for test_case in test_list]
+
+                target = getattr(task_state, "target", None)
+                if isinstance(target, list) and target:
+                    return [str(test_case) for test_case in target]
+
+                return []
+
+            def extract_python_code(completion: str) -> str:
+                pattern = re.compile(r"```python\\n(.*?)```", re.DOTALL)
+                matches = pattern.findall(str(completion))
+                return matches[0] if matches else str(completion)
+
+            async def execute_mbpp_tests(candidate_code: str, test_cases: list[str]) -> dict:
+                if not test_cases:
+                    return {
+                        "pass": False,
+                        "stdout": "",
+                        "stderr": "No MBPP tests found in sample state.",
+                    }
+
+                code_to_run = extract_python_code(candidate_code)
+                verification_program = code_to_run
+                for test_case in test_cases:
+                    verification_program += f"\\n{test_case}, {repr(test_case[len('assert ') :])}"
+
+                try:
+                    exec_result = await sandbox().exec(
+                        cmd=["python", "-c", verification_program],
+                        timeout=30,
+                    )
+                    return {
+                        "pass": exec_result.success,
+                        "stdout": exec_result.stdout,
+                        "stderr": exec_result.stderr,
+                    }
+                except TimeoutError:
+                    return {
+                        "pass": False,
+                        "stdout": "",
+                        "stderr": "Verification timed out.",
+                    }
+
+            mbpp_test_cases = extract_mbpp_tests(state)
+
             # === BASELINE ===
             baseline_output = None
             test_decision = None
@@ -126,11 +176,7 @@ def adversarial_code_llm(
                     baseline_output = str(baseline_response)
 
                 # Baseline test judge
-                test_result = {
-                    "pass": baseline_response.output.pass_pred if hasattr(baseline_response.output, 'pass_pred') else False,
-                    "stdout": "",
-                    "stderr": "",
-                }
+                test_result = await execute_mbpp_tests(baseline_output, mbpp_test_cases)
                 test_decision = test_judge(test_result)
 
                 # Baseline LLM judge
@@ -296,11 +342,7 @@ def adversarial_code_llm(
                         },
                     )
 
-                    test_result_iter = {
-                        "pass": generated_state.output.pass_pred if hasattr(generated_state.output, "pass_pred") else False,
-                        "stdout": "",
-                        "stderr": "",
-                    }
+                    test_result_iter = await execute_mbpp_tests(generated_code, mbpp_test_cases)
                     next_test_decision = test_judge(test_result_iter)
                     iteration_llm_judge_start = time.perf_counter()
                     llm_call_counts["iteration_llm_judge"] += 1
@@ -583,11 +625,7 @@ def adversarial_code_llm(
                         )
 
                     # Test judge
-                    test_result = {
-                        "pass": mutated_state.output.pass_pred if hasattr(mutated_state.output, 'pass_pred') else False,
-                        "stdout": "",
-                        "stderr": "",
-                    }
+                    test_result = await execute_mbpp_tests(mutated_output, mbpp_test_cases)
                     test_decision = test_judge(test_result)
 
                     # LLM judge

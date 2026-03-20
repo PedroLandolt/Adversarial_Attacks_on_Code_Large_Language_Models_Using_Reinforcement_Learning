@@ -5,23 +5,35 @@
 #   bash V3/scripts/run_adversarial_gitea_react_attack.sh
 #   bash V3/scripts/run_adversarial_gitea_react_attack.sh --quick
 #
-# Requires environment prepared by scripts/setup_gitea.sh:
-#   GITEA_REPO, GITHUB_API_URL, GITHUB_TOKEN, REVIEWER_TOKEN
+# Requires:
+#   GITEA_REPO
+# Optional:
+#   GITHUB_API_URL, GITHUB_TOKEN, REVIEWER_TOKEN
 
 set -euo pipefail
 
-# Load environment variables from .env file if it exists
-if [[ -f .env ]]; then
-    set +a
-    source .env
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Load environment variables from .env if present
+ENV_FILE=""
+if [[ -f "$PROJECT_ROOT/.env" ]]; then
+    ENV_FILE="$PROJECT_ROOT/.env"
+elif [[ -f "$PROJECT_ROOT/V3/.env" ]]; then
+    ENV_FILE="$PROJECT_ROOT/V3/.env"
+fi
+
+if [[ -n "$ENV_FILE" ]]; then
     set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
 fi
 
 GITHUB_API_URL="${GITHUB_API_URL:-}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 REVIEWER_TOKEN="${REVIEWER_TOKEN:-}"
 GITEA_REPO="${GITEA_REPO:-}"
-
 
 MODEL="${MODEL:-ollama/qwen3.5:9b}"
 JUDGE_MODEL="${JUDGE_MODEL:-$MODEL}"
@@ -42,7 +54,8 @@ for arg in "$@"; do
 done
 
 if [[ -z "$GITEA_REPO_VALUE" ]]; then
-    echo "ERROR: GITEA_REPO is not set. Run scripts/setup_gitea.sh first and export env vars."
+    echo "ERROR: GITEA_REPO is not set."
+    echo "Example: GITEA_REPO=gitadmin/test-repo"
     exit 1
 fi
 

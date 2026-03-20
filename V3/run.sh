@@ -2,18 +2,44 @@
 
 # Unified launcher for task presets in adversarial_attack.py
 # Usage:
-#   bash V3/run.sh                 # default: mbpp react task
-#   bash V3/run.sh mbpp            # run adversarial_code_llm preset
-#   bash V3/run.sh gitea           # run adversarial_gitea_react_attack preset
+#   bash V3/run.sh
+#   bash V3/run.sh mbpp
+#   bash V3/run.sh gitea
 #   bash V3/run.sh mbpp --quick
 #   bash V3/run.sh gitea --quick
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 TASK="mbpp"
 EXTRA_ARGS=()
 
+# ------------------------------------------------------------
+# Load .env automatically if present
+# Prefer project root .env, fallback to V3/.env
+# ------------------------------------------------------------
+ENV_FILE=""
+if [[ -f "$PROJECT_ROOT/.env" ]]; then
+    ENV_FILE="$PROJECT_ROOT/.env"
+elif [[ -f "$SCRIPT_DIR/.env" ]]; then
+    ENV_FILE="$SCRIPT_DIR/.env"
+fi
+
+if [[ -n "$ENV_FILE" ]]; then
+    echo "Loading environment from: $ENV_FILE"
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
+else
+    echo "No .env file found in project root or V3 directory. Using current shell environment."
+fi
+
+# ------------------------------------------------------------
+# Parse task preset
+# ------------------------------------------------------------
 if [[ $# -ge 1 ]]; then
     case "$1" in
         mbpp|gitea)
@@ -27,10 +53,36 @@ if [[ $# -gt 0 ]]; then
     EXTRA_ARGS=("$@")
 fi
 
+# ------------------------------------------------------------
+# Effective config preview
+# ------------------------------------------------------------
+EFFECTIVE_MODEL="${MODEL:-ollama/qwen3.5:9b}"
+EFFECTIVE_JUDGE_MODEL="${JUDGE_MODEL:-$EFFECTIVE_MODEL}"
+EFFECTIVE_SELECTOR_MODEL="${SELECTOR_MODEL:-$EFFECTIVE_JUDGE_MODEL}"
+EFFECTIVE_MAX_ITER="${MAX_ITER:-3}"
+EFFECTIVE_LIMIT="${LIMIT:-5}"
+EFFECTIVE_MAX_SAMPLES="${MAX_SAMPLES:-2}"
+EFFECTIVE_BASE_BRANCH="${BASE_BRANCH:-main}"
+EFFECTIVE_GITEA_REPO="${GITEA_REPO:-}"
+
 echo "============================================================"
 echo "Adversarial Attack Launcher"
 echo "============================================================"
-echo "Task preset: $TASK"
+echo "Task preset:        $TASK"
+echo "MODEL:              $EFFECTIVE_MODEL"
+echo "JUDGE_MODEL:        $EFFECTIVE_JUDGE_MODEL"
+echo "SELECTOR_MODEL:     $EFFECTIVE_SELECTOR_MODEL"
+echo "MAX_ITER:           $EFFECTIVE_MAX_ITER"
+echo "LIMIT:              $EFFECTIVE_LIMIT"
+echo "MAX_SAMPLES:        $EFFECTIVE_MAX_SAMPLES"
+if [[ "$TASK" == "gitea" ]]; then
+    echo "BASE_BRANCH:        $EFFECTIVE_BASE_BRANCH"
+    echo "GITEA_REPO:         ${EFFECTIVE_GITEA_REPO:-<not set>}"
+fi
+if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
+    echo "EXTRA_ARGS:         ${EXTRA_ARGS[*]}"
+fi
+echo "============================================================"
 
 action_mbpp() {
     bash "$SCRIPT_DIR/scripts/run_adversarial_code_llm.sh" "${EXTRA_ARGS[@]}"
@@ -49,6 +101,7 @@ case "$TASK" in
         ;;
     *)
         echo "Unknown task preset: $TASK"
+        echo "Valid options: mbpp | gitea"
         exit 1
         ;;
 esac

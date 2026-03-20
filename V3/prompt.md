@@ -78,7 +78,7 @@ If a task requires deleting dead code, only delete code proven to be unused or h
 
 ---
 
-# [ ] TASK 1 — Create a true smoke-test mode before any correctness work
+# [x] TASK 1 — Create a true smoke-test mode before any correctness work
 
 ## Goal
 Make the adversarial MBPP task runnable in under a few minutes for 1 sample on local hardware.
@@ -126,7 +126,7 @@ A single sample should complete fast enough to debug manually, and logs should c
 - do not leave `decompose()` or `submit()` inside the MBPP React benchmark loop
 - do not refactor unrelated architecture
 
-# [ ] TASK 1.1 — Add temporary instrumentation to prove where time is spent
+# [x] TASK 1.1 — Add temporary instrumentation to prove where time is spent
 
 ## Goal
 Measure actual latency per step before further fixes.
