@@ -10,10 +10,18 @@
 
 set -euo pipefail
 
-GITHUB_TOKEN=3d0d7f373c39445b361c62e1ed2de98d05c15c1a
-REVIEWER_TOKEN=2b25e30f6f3619dceb01e40cf7e23e0276768121
-GITHUB_API_URL=http://localhost:3001/api/v1
-GITEA_REPO=gitadmin/test-repo
+# Load environment variables from .env file if it exists
+if [[ -f .env ]]; then
+    set +a
+    source .env
+    set -a
+fi
+
+GITHUB_API_URL="${GITHUB_API_URL:-}"
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+REVIEWER_TOKEN="${REVIEWER_TOKEN:-}"
+GITEA_REPO="${GITEA_REPO:-}"
+
 
 MODEL="${MODEL:-ollama/qwen3.5:9b}"
 JUDGE_MODEL="${JUDGE_MODEL:-$MODEL}"
