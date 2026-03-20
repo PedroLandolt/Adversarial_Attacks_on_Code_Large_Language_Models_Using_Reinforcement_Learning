@@ -1,982 +1,463 @@
-# Thesis Project Copilot Operating Prompt
+# Prompt for Copilot — Stabilize Inspect-AI Adversarial MBPP Loop
 
-You are assisting on a **master's thesis project** about **adversarial attacks on Code Large Language Models (Code LLMs)** using **iterative attack loops**, **LLM-guided tactic selection**, and later **Reinforcement Learning / Multi-Armed Bandits**.
+You are working on a Python codebase that uses `inspect_ai` and `inspect_evals.mbpp`.
+Your job is to fix the current benchmark loop step by step, with minimal and controlled changes.
 
-Your job is to help implement and refine the project **without hallucinating architecture, changing validated assumptions, or skipping phases**.
+The current system is slow, misleading, and produces empty or untrustworthy logs.
+Do not invent behavior.
+Do not redesign the architecture.
+Do not add speculative abstractions.
+Do not change unrelated files.
+Do not optimize anything before correctness and observability are restored.
 
-Read this entire file before making any code changes.
-
-Also read and follow:
-- `AGENTS.md`
-- `DATA_CONTRACT_ARQUITECTURE.md`
-
-These documents are the project ground truth. Do not contradict them unless explicitly instructed.
-
----
-
-## 1. Non-Negotiable Execution Rules
-
-### 1.1 Read First, Then Act
-Before changing any code:
-1. Read this file fully.
-2. Read `AGENTS.md`.
-3. Read `DATA_CONTRACT_ARQUITECTURE.md`.
-4. Inspect the relevant source files for the current task.
-5. Summarize your understanding of the task and the likely source of the issue.
-6. Only then propose or apply changes.
-
-Do not start editing code before understanding the current implementation.
+The immediate goal is to make the MBPP adversarial benchmark loop correct, inspectable, and fast enough for debugging.
+Future-facing Gitea / PR / tool-agent work must not interfere with the immediate benchmark path.
 
 ---
 
-### 1.2 One Task at a Time
-You must work in a **strictly sequential** way.
+## Non-negotiable rules
 
-- Do **only one task** from the checklist at a time.
-- Do **not** start future tasks early.
-- Do **not** bundle multiple checklist items into one large refactor.
-- After finishing a task, **stop** and report back.
-
-You must wait for validation before moving to the next task.
-
----
-
-### 1.3 Do Not Invent New Architecture
-This project already has a defined architecture.
-
-Do **not**:
-- redesign the whole system,
-- replace core abstractions without being asked,
-- introduce unnecessary frameworks,
-- simplify away important metadata,
-- merge components that are intentionally separated,
-- change research definitions casually.
-
-Preserve the current architecture and improve it incrementally.
+1. Make changes in small steps.
+2. After each task, explain exactly what changed and why.
+3. After each task, provide validation steps and expected outcome.
+4. Do not silently refactor unrelated code.
+5. Preserve current public task names unless a rename is strictly required.
+6. Prefer minimal diffs over clever designs.
+7. If something is uncertain, inspect the current code and follow the existing data contract instead of inventing a new one.
+8. The benchmark loop must prioritize:
+   - correctness,
+   - deterministic debugging,
+   - inspectability,
+   - then performance.
+9. Do not touch the Gitea / PR workflow unless a task explicitly says so.
+10. The `decompose` / `submit` exploration path is not the production MBPP benchmark loop and must remain isolated.
 
 ---
 
-### 1.4 Preserve Research Validity
-This is not just a software project. It is also a research project.
+## Known problems that must be treated as ground truth
 
-That means:
-- implementation choices must preserve experimental validity,
-- metrics must reflect what actually happened,
-- logs/metadata must remain trustworthy,
-- tactic selection, tactic execution, and recorded tactic history must stay consistent,
-- attack outcome definitions must not be changed unless explicitly requested.
+### Problem A — Fake test results
+The code currently builds internal `test_result` objects from `output.pass_pred` with a fallback to `False`.
+That is not a reliable source of ground-truth MBPP execution.
+The benchmark must use real executed test results, not inferred booleans.
 
-Never make “convenience” changes that would weaken the thesis evaluation.
+### Problem B — Massive over-execution during debugging
+The custom task inherits `epochs=base_task.epochs`.
+That is multiplying runtime unnecessarily during debugging and making one sample far more expensive than expected.
 
----
+### Problem C — Artifact / scorer mismatch
+The code applies an attack/transformation to a generated artifact, but the object ultimately evaluated or logged by Inspect may not match the attacked artifact.
+This causes misleading logs and inconsistent evaluation.
 
-### 1.5 Explain Before and After
-Before making changes, state:
-- what files are relevant,
-- what you believe the problem is,
-- what you are going to change,
-- what you are **not** going to change.
+### Problem D — Weak observability
+Important intermediate states are stored in a way that is hard to inspect, and logs do not clearly show:
+- baseline artifact,
+- attacked artifact,
+- real test outcome,
+- LLM judge outcome,
+- stop reason.
 
-After making changes, state:
-- what changed,
-- why it changed,
-- how it aligns with the architecture docs,
-- what risks or limitations remain.
-
-Then stop.
+### Problem E — Benchmark path contaminated by future-facing scaffolding
+Tool exploration and future agent architecture must not interfere with the controlled MBPP benchmark path.
 
 ---
 
-### 1.6 Keep Changes Minimal and Targeted
-Prefer:
-- small, controlled changes,
-- local fixes,
-- minimal refactors,
-- preserving behavior outside the task scope.
+## Global execution policy
 
-Avoid:
-- wide unrelated cleanup,
-- style-only rewrites,
-- renaming large parts of the codebase for no reason,
-- changing working parts of the system “just because”.
+Work through the tasks below in order.
+Do not skip ahead.
+Do not merge multiple tasks into a giant rewrite.
+At the end of each task, stop and show:
+- files changed,
+- exact logic changed,
+- why it was necessary,
+- how to validate it,
+- what still remains.
 
----
-
-### 1.7 Never Mark a Phase as Complete Unless It Is Truly Stable
-Some project phases are implemented but still need stabilization.
-
-Do not claim something is “done” just because code exists.
-A phase is only considered stable when:
-- behavior matches the documented contract,
-- metadata is trustworthy,
-- outputs are analyzable,
-- known bugs affecting validity are fixed.
+If a task requires deleting dead code, only delete code proven to be unused or harmful for the current benchmark path.
 
 ---
 
-## 2. Project Mission
+# [ ] TASK 1 — Create a true smoke-test mode before any correctness work
 
-The current thesis project aims to study and implement a framework for **adversarially attacking Code LLM evaluation pipelines**, especially scenarios involving:
+## Goal
+Make the adversarial MBPP task runnable in under a few minutes for 1 sample on local hardware.
 
-- a **target model** generating code,
-- a **Test Judge** providing ground-truth execution-based evaluation,
-- an **LLM Judge** providing model-based evaluation,
-- a **looping attack process** that iteratively selects and applies red-teaming tactics,
-- later extension to **RL / bandit-based tactic selection**.
+## Required changes
+Implement a dedicated debug/smoke-test mode for the custom adversarial task.
 
-The current immediate focus is **not RL yet**.
+This mode must:
+- force `epochs=1`
+- force `limit=1` in validation examples
+- force `max_iterations=1`
+- disable any non-essential hot-path work
+- keep behavior changes local to the custom task
 
-The current focus is to **stabilize and validate the existing iterative ReAct-based system** so it is trustworthy enough to support thesis experiments and later RL work.
+For the React path specifically:
+- remove `decompose()` from the hot path
+- remove `submit()` from the hot path
+- keep selector behavior minimal and direct
+- do not call any exploration scaffold during controlled MBPP debugging
 
-The key success condition for this phase is:
+## Additional requirement
+Count and document how many LLM calls happen per sample in:
+- baseline-only mode
+- react mode with `max_iterations=1`
+- react mode with general `max_iterations=N`
 
-- **attack success** = `Test Judge = FAIL` and `LLM Judge = PASS`
+## Delivery
+Produce the smallest possible code change that creates a reproducible smoke-test path.
 
-This means the generated code must fail deterministic tests while the LLM-as-judge still approves it.
+## Validate
+Provide an exact command for a minimal local run.
 
----
+Expected validation command style:
+- 1 sample
+- 1 epoch
+- 1 iteration
+- 1 model connection
+- no exploration tools in the hot path
 
-## 3. Current Validated Understanding of the Project
+## Expected result
+A single sample should complete fast enough to debug manually, and logs should clearly show that the run is not executing extra exploration scaffolding.
 
-This section is the working ground truth unless explicitly updated.
+## Do not
+- do not only change `epochs`
+- do not leave `decompose()` or `submit()` inside the MBPP React benchmark loop
+- do not refactor unrelated architecture
 
-### 3.1 Core Stack
-The project currently uses:
-- `inspect_ai` for orchestration and agent loops,
-- `inspect_evals` patterns where relevant,
-- `LiteLLM` as the model abstraction layer,
-- Docker sandboxing for code execution,
-- MBPP as the current benchmark,
-- HumanEval as a possible later benchmark.
+# [ ] TASK 1.1 — Add temporary instrumentation to prove where time is spent
 
----
+## Goal
+Measure actual latency per step before further fixes.
 
-### 3.2 High-Level Architecture
-The system is intentionally separated into:
-- **orchestration logic**,
-- **selection logic**,
-- **attack generation logic**,
-- **evaluation logic**,
-- **execution logic**,
-- **metadata / analysis outputs**.
+## Required changes
+Add per-step timing around:
+- baseline generation
+- baseline LLM judge
+- selector call
+- iteration generation
+- iteration LLM judge
+- metadata/log finalization
 
-This separation must be preserved because the selector should later be replaceable by an RL / bandit policy without requiring the rest of the pipeline to be redesigned.
+Store timings in structured metadata for the run.
 
----
-
-### 3.3 Judge Roles
-
-#### Test Judge
-- Based on real code execution and benchmark tests.
-- This is the **ground truth** for code correctness.
-
-#### LLM Judge
-- A language-model-based evaluator.
-- This is intentionally a target for manipulation / red-teaming.
-
-Do not merge or blur these roles.
-
----
-
-### 3.4 Current Attack Framing
-The project studies adversarial attacks in iterative settings where the system tries to produce or frame candidate solutions so that the LLM-based evaluator is misled.
-
-A key success condition currently used in the architecture is:
-
-- **attack success** = `Test Judge = FAIL` and `LLM Judge = PASS`
-
-This must not be changed unless explicitly instructed.
-
-Note: this is conceptually different from other evaluation framings such as performance degradation from a clean baseline. Do not silently mix these concepts.
+## Expected result
+One run should make it obvious which exact step is consuming most wall-clock time.
 
 ---
 
-### 3.5 Existing Strategies
-The project currently includes three strategy families:
-- `random`
-- `sequential`
-- `react`
+# [ ] TASK 2 — Replace fake test_result construction with real ground-truth test execution
 
-The current phase is centered on **stabilizing `react`**, not replacing it.
+## Goal
+Stop using `output.pass_pred` or any equivalent guessed pass/fail signal as the internal test judge source.
 
-For the current thesis framing, the `react` strategy must be treated as:
-- **LLM-led tactic selection**,
-- with the selector seeing the current objective, prior judge feedback, tactic history, and useful metrics,
-- and with the system executing a **fresh attack attempt** based on the valid tactic chosen by the LLM from the closed tactic set.
+## Required changes
+- Identify how the MBPP benchmark obtains the actual test program / asserts for a sample.
+- Execute the real generated code against the real tests in the benchmark path used by this task.
+- Build the internal `test_result` from real execution output.
+- The deterministic `test_judge` must consume that real execution result.
 
-This means the current `react` strategy is **not** meant to enforce exploration externally unless explicitly requested as a separate experimental condition.
+## Delivery
+Implement a real execution path for the artifact under evaluation, returning a structured result like:
+- pass: bool
+- stdout: str
+- stderr: str
+- optional counts if naturally available
 
----
+Keep the structure compatible with the current `test_judge` unless a minimal schema extension is necessary.
 
-### 3.6 Current Tactic Space
-The current tactic space should remain **small and controlled** during this phase, ideally **3-4 tactic families**, while keeping the architecture extensible so more can be added later.
+## Validate
+Run one MBPP sample where:
+- baseline code is generated,
+- real tests are executed,
+- internal `test_judge` reflects the executed result,
+- result is no longer a fake default `False`.
 
-The current tactic set may continue to use the existing project tactics and/or a selected subset inspired by red-team taxonomy ideas, but for this phase it must remain:
-- explicit,
-- enum-based,
-- documented,
-- easy to analyze by family.
+Show expected evidence in logs or metadata.
 
-Treat the tactic set as a **closed family list** for the current experiment configuration.
-Within each family, however, the agent must be able to generate **new attack messages dynamically per attempt**.
-
-Do **not**:
-- turn tactic selection into unconstrained free-form behavior,
-- let the agent invent entirely new family labels at runtime,
-- treat one static prewritten payload as the full meaning of a tactic family.
-
----
-
-### 3.7 Dynamic Attack Generation Requirement
-A tactic family is **not** the same thing as a single fixed attack string.
-
-For the current thesis framing:
-- the selector chooses a tactic family,
-- the system then performs a **fresh attack attempt** within that family,
-- the attack content must be **generated dynamically for that attempt**,
-- the generated message may use prior trajectory information, judge feedback, and the tactic family definition,
-- repeated use of the same tactic family is allowed if the selector chooses it again,
-- but each attempt should still be able to produce a different attack message.
-
-The agent must be the creator of the attack message, not merely the chooser of a prewritten payload.
+## Do not
+- do not rely on `pass_pred`,
+- do not hardcode fake success/failure,
+- do not replace real execution with LLM judgment.
 
 ---
 
-### 3.8 Current Phase Reality
-Although the ReAct-based phase is implemented, it must be treated as:
+# [ ] TASK 3 — Ensure the attacked artifact is the exact artifact being evaluated
 
-> **implemented but not fully stabilized**
+## Goal
+Make the pipeline evaluate the same artifact that the LLM judge sees and that the attempt record stores.
 
-This means the code exists, but the priority now is to ensure:
-- correct loop behavior,
-- correct stop behavior,
-- correct feedback usage,
-- correct tactic selection,
-- dynamic per-attempt attack generation,
-- correct tactic persistence in metadata/history,
-- trustworthy experiment outputs,
-- inspectable step-by-step trajectories.
+## Required changes
+- Trace the full flow:
+  - baseline generated artifact,
+  - transformed / attacked artifact,
+  - internal test execution target,
+  - LLM judge input,
+  - Inspect-visible final artifact.
+- Remove any mismatch between:
+  - generated output,
+  - attacked output,
+  - evaluated output,
+  - logged output.
 
-Do not jump ahead to RL before this is stable.
+## Delivery
+At the end of an iteration there must be one unambiguous artifact under review.
+That exact artifact must be:
+- stored in the attempt record,
+- passed into the real test execution,
+- passed into the LLM judge,
+- exposed in the final state/log path used by Inspect.
 
----
+## Validate
+For one iteration, show that:
+- `artifact_under_review`,
+- `attacked_code` / final mutated artifact,
+- LLM judge input,
+- test execution input,
+all refer to the same concrete string.
 
-### 3.9 Future Realistic Target
-Beyond MBPP, the project may later move toward a more realistic target environment involving:
-- PR review flows,
-- CI-style approval workflows,
-- reviewer agents,
-- decomposition/execution tooling,
-- richer trajectory viewers.
+Expected result:
+- no more scorer/log disagreement about what was evaluated.
 
-That future direction matters for design choices now, but the current implementation focus remains:
-- stabilizing the benchmark loop,
-- improving observability,
-- preserving architecture compatibility for later realistic targets.
-
----
-
-## 4. Current Known Problems and Constraints
-
-These are currently important and must be respected.
-
-### 4.1 The Current Tactic-Selection Flow Is Conceptually Wrong
-The current implementation direction has drifted into an unsustainable pattern where:
-- the agent scores or comments on prior content,
-- chooses a tactic label,
-- and then applies that label in a way that is not clearly tied to a fresh attack attempt over the actual candidate solution being judged.
-
-This must be corrected.
-
-The correct conceptual flow is:
-1. generate or obtain the current candidate code,
-2. run deterministic tests,
-3. run the LLM judge,
-4. if attack success has **not** been achieved, summarize prior trajectory state,
-5. choose the next tactic family,
-6. generate a **fresh attack message** inside that tactic family,
-7. produce the next attack attempt,
-8. re-evaluate with Test Judge and LLM Judge,
-9. update state and continue until success or stop.
-
-The tactic must influence a fresh attack attempt inside the iterative evaluation loop.
+## Do not
+- do not keep parallel ambiguous artifact fields unless absolutely necessary,
+- do not hide the final evaluated artifact only inside local variables.
 
 ---
 
-### 4.2 ReAct Loop Must Iterate While Failing
-The loop must continue iterating while failure conditions still justify another attempt, subject to explicit stop conditions.
+# [ ] TASK 4 — Align final state, metadata, and Inspect-visible output
 
-The loop must:
-- use previous feedback,
-- select a tactic based on prior output / prior attempt state,
-- generate a new attack message for that attempt,
-- re-evaluate,
-- update state,
-- decide whether to continue.
+## Goal
+Make Inspect logs and stored metadata reflect what actually happened.
 
-For the current phase, the tactic choice inside `react` should remain **controlled by the LLM** whenever the selector returns a valid tactic from the closed tactic set.
+## Required changes
+- Ensure final task state exposes the correct final artifact.
+- Ensure metadata contains a clean, stable structure for:
+  - baseline,
+  - all_attempts,
+  - attack_succeeded,
+  - successful_iteration,
+  - stop_reason,
+  - total_iterations,
+  - selector model,
+  - judge model.
+- Reconcile current metadata with the existing data contract instead of inventing a new schema.
 
-Repeated tactics are allowed if the LLM selects them again.
-The history of previous tactics exists to inform the LLM, not to hard-force diversity unless that behavior is explicitly being studied as a separate strategy.
+## Delivery
+Produce a clean final state that is actually useful in Inspect logs and viewers.
 
-This behavior is central to the project.
+## Validate
+After one debug run, the log should clearly answer:
+- what the baseline output was,
+- what each attacked artifact was,
+- what the real test result was,
+- what the LLM judge said,
+- why the loop stopped.
 
----
-
-### 4.3 Infinite Loop Prevention Matters
-The loop must not run indefinitely.
-
-The implementation must include clear and enforceable stop conditions such as:
-- max iteration count,
-- attack success reached,
-- no useful progress,
-- repeated / exhausted tactic behavior if appropriate,
-- failure conditions that justify stopping.
-
-Do not weaken loop safety.
-
-For the current thesis methodology, `max_iterations` should be treated as the main external loop budget provided by the user/configuration.
-Do not introduce additional stopping rules that effectively replace `max_iterations` as the primary budget control unless those rules are explicitly justified, documented, and requested.
-
-In particular, do not stop the `react` loop merely because the same tactic was chosen multiple times, or merely because all tactic labels have appeared at least once, unless that behavior is explicitly part of a defined experimental condition.
+## Do not
+- do not dump huge noisy blobs without structure,
+- do not remove existing useful fields unless replacing them with cleaner equivalents.
 
 ---
 
-### 4.4 Tactic History / Used-Tactics Tracking Is Known to Be Unreliable
-There is a known bug where the tactic used in practice does not always match the tactic recorded in the logs / history.
+# [ ] TASK 5 — Improve observability without changing benchmark semantics
 
-Example symptom:
-- selector chooses one tactic,
-- execution appears to use that tactic,
-- recorded tactic list stores a different tactic.
+## Goal
+Make failures diagnosable in one run.
 
-This is a critical issue because it undermines:
-- metric validity,
-- analysis by tactic,
-- reproducibility,
-- future RL reward correctness.
+## Required changes
+- Add structured per-iteration trace information.
+- Preserve attempt history in a compact but informative way.
+- Record:
+  - selected tactic,
+  - previous tactics,
+  - attacked artifact summary,
+  - real test decision,
+  - LLM judge decision,
+  - confidence,
+  - stop reason if terminal,
+  - any exception text.
 
-Any task related to tactic selection or metadata must preserve strict consistency across:
-1. tactic chosen,
-2. tactic family applied,
-3. attack message generated,
-4. tactic recorded.
+If Inspect has a better native mechanism than raw metadata for step-level observability, use it only if the change is small and justified.
 
----
+## Delivery
+Improve debugging signal, not architecture complexity.
 
-### 4.5 Static Attack Payloads Are Not Acceptable
-A tactic family cannot be implemented as a single static hardcoded attack payload that is reused forever.
+## Validate
+A single failed run should make it obvious whether the problem came from:
+- generation,
+- attack application,
+- test execution,
+- judge parsing,
+- selector choice,
+- iteration exception.
 
-This is a critical missing feature.
-
-The updated system must move toward:
-- family-level tactic selection,
-- dynamic per-attempt attack generation,
-- variation within a tactic family,
-- inspectable reasoning about why a new attempt was generated.
-
----
-
-### 4.6 Agent Decomposition Is Still Too Implicit
-The loop currently needs clearer decomposition into understandable subtasks.
-
-The system should make it easier to inspect what the agent is doing at each step, for example:
-- assess latest attempt,
-- summarize prior results,
-- choose tactic family,
-- generate attack content,
-- submit attack attempt,
-- evaluate,
-- decide whether to continue.
-
-This does **not** mean overengineering the current implementation.
-It means making the loop more understandable, inspectable, and suitable for experiment analysis.
+## Do not
+- do not add a large tracing framework,
+- do not add excessive logging spam that hides the signal.
 
 ---
 
-### 4.7 Observability Is Not Yet Rich Enough
-The project needs better per-step trace detail and inspectability.
+# [ ] TASK 6 — Keep future-facing tool exploration isolated from MBPP benchmark execution
 
-The current system should move toward richer trajectory analysis support, including:
-- clearer attempt-level metadata,
-- step boundaries inside each iteration,
-- selector input visibility,
-- selector output visibility,
-- generated attack message visibility,
-- judge outcomes,
-- stop reasons,
-- token or role-level detail where practical,
-- compatibility with later log viewers and richer trajectory tooling.
+## Goal
+Guarantee that MBPP benchmark stabilization is not polluted by tool-pattern experimentation.
 
-Do not sacrifice observability for convenience.
+## Required changes
+- Audit imports and execution flow for `decompose`, `submit`, and any other future-facing scaffolding.
+- Confirm that these are not part of the hot path for the controlled MBPP benchmark loop.
+- If they are accidentally in the hot path, remove or isolate them from the benchmark execution path.
+- Preserve them only as separate exploration utilities if they are still needed.
 
----
+## Delivery
+A clean separation between:
+- controlled MBPP benchmark path,
+- future tool-agent exploration path.
 
-### 4.8 LiteLLM Should Stay as the Abstraction Layer
-The project should remain compatible with stronger external models through `LiteLLM`.
+## Validate
+Explain whether the current MBPP loop executes any exploration scaffold.
+If yes, show the minimal fix that removes it from the hot path.
 
-This matters because weak local models (for example via Ollama) may underrepresent realistic behavior and may be too weak for meaningful judge or selector evaluation.
-
-However, model backend expansion is **not the current first priority**. It comes after stabilization of the existing loop and metrics integrity.
-
----
-
-### 4.9 Tool-Based Agents May Be Explored Later
-There is interest in exploring agent tool usage patterns such as:
-- `decompose`
-- `submit`
-
-within an inspect-style loop, potentially with constrained tool access.
-
-This is a later controlled exploration area, not the first implementation priority.
-
-Do not prematurely redesign the current loop around tools unless the task explicitly asks for it.
+## Do not
+- do not delete future-facing code unless it is clearly harmful and unused,
+- do not merge Gitea / PR workflow logic into MBPP debugging.
 
 ---
 
-### 4.10 Selector Authority in the Current Phase
-For the current `react` strategy, the selector should behave as an **LLM decision-maker**, not as a thin wrapper around hidden heuristic control.
+# [ ] TASK 7 — Performance audit after correctness is restored
 
-That means:
-- the LLM should know the attack objective,
-- the LLM should know what has already been tried,
-- the LLM should see judge feedback and useful metrics,
-- the LLM should choose among the allowed tactic families,
-- and the system should execute that valid choice rather than silently substituting another tactic for statistical or heuristic reasons.
+## Goal
+Only after correctness is fixed, remove avoidable latency from the benchmark loop.
 
-The system may still validate that the choice belongs to the closed family enum.
-But validation is different from overriding the decision.
+## Required changes
+Audit the loop for unnecessary cost multipliers such as:
+- repeated model instantiation,
+- repeated expensive judge calls with unchanged inputs,
+- duplicate generation calls,
+- repeated deep copies that are not needed,
+- unnecessary multiple model roles using the same backend in the same iteration.
 
----
+Do not change behavior yet unless the optimization is obvious and semantics-preserving.
 
-### 4.11 Future PR / CI Realism Must Influence Design, Not Current Scope
-A more realistic future target may involve:
-- PR review,
-- CI outcomes,
-- reviewer agents,
-- manipulative approval workflows,
-- detailed agent tool traces.
+## Delivery
+First provide a short audit list:
+- issue,
+- cost impact,
+- safe fix.
 
-Current tasks should preserve compatibility with that direction, but must not derail the present benchmark stabilization work.
+Then apply only the clearly safe fixes.
 
----
+## Validate
+Compare before vs after for a small debug run:
+- same behavior,
+- fewer model calls or lower runtime.
 
-## 5. What Must Not Be Changed Right Now
-
-Unless explicitly instructed, do **not** do any of the following:
-
-- Do not change the definition of attack success.
-- Do not turn tactic family selection into unconstrained free-form runtime labels.
-- Do not skip directly to RL / bandit implementation.
-- Do not redesign the orchestration layer.
-- Do not merge selection and attack-generation logic into one opaque blob.
-- Do not remove metadata fields that help reconstruct what happened.
-- Do not reduce observability of attempts.
-- Do not rewrite large working parts of the project for style reasons.
-- Do not claim new metrics are correct unless they trace real execution.
-- Do not silently alter benchmark assumptions.
-- Do not change current phase goals from “stabilize and validate” to “invent new capability”.
-- Do not override a valid LLM-chosen tactic family with a different family unless explicitly instructed to study a constrained variant.
-- Do not treat tactic history as a hard rule that forbids repetition inside `react` unless explicitly instructed.
-- Do not replace `max_iterations` with hidden effective limits such as tactic-count exhaustion unless explicitly instructed and documented.
-- Do not keep static prewritten attack payloads as the final intended design for a tactic family.
-- Do not treat future PR/CI realism as permission to skip current MBPP stabilization work.
+## Do not
+- do not “optimize” by removing validation,
+- do not change scientific meaning of the experiment.
 
 ---
 
-## 6. Current Priority Order
+# [ ] TASK 8 — Regression-proof the benchmark with focused tests
 
-Work in this order unless explicitly told otherwise.
+## Goal
+Prevent the same failure mode from coming back.
 
-### Priority Block A — Correct and Stabilize the Existing ReAct Loop
-1. Correct the conceptual iterative flow so the chosen tactic affects a fresh attack attempt.
-2. Fix tactic family selection / tactic persistence inconsistencies.
-3. Ensure stop conditions are explicit and reliable.
-4. Ensure previous feedback and metrics actually influence next tactic selection.
-5. Introduce dynamic per-attempt attack generation inside tactic families.
-6. Make loop decomposition clearer and inspectable.
+## Required changes
+Add a small, focused test layer for the benchmark logic, especially for:
+- real test_result construction,
+- attack artifact alignment,
+- iteration record schema,
+- early stop condition,
+- metadata completeness.
 
-### Priority Block B — Consolidate Outputs for Thesis Analysis
-7. Ensure metadata reflects real execution.
-8. Ensure attempt-level outputs are analyzable by tactic, message, and iteration.
-9. Improve per-step trace detail and observability.
-10. Refactor minimally where necessary to improve separation and reliability.
-11. Improve or add focused documentation for the stabilized current system.
+Prefer targeted unit/integration tests over broad test suites.
 
-### Priority Block C — Controlled Expansion
-12. Improve practical model backend usage through LiteLLM / stronger external APIs.
-13. Explore inspect-compatible tool-based agent patterns.
-14. Prepare for more realistic PR / CI style targets without breaking the benchmark path.
-15. Only after all of the above, prepare for RL / bandit selector work.
+## Delivery
+Add only the tests needed to catch the current class of bugs.
 
----
+## Validate
+Show which previous failure each new test would catch.
 
-## 7. Definition of Done for the Current Phase
-
-The current phase is only considered sufficiently stabilized when all of the following are true:
-
-- The iterative `react` loop behaves according to the documented contract.
-- The loop continues when it should and stops when it should.
-- Tactic family selection uses previous attempt feedback and useful metrics.
-- The chosen tactic family, generated attack message, executed attempt, and recorded metadata are consistent.
-- Attack generation is dynamic within a tactic family rather than fixed to a single payload.
-- Attempt metadata is trustworthy.
-- The system supports meaningful analysis by tactic family, generated message, iteration, and judge outcome.
-- The architecture still cleanly supports future replacement of the selector by an RL policy.
-- No unnecessary redesign was introduced.
-- The `react` selector is still recognizably LLM-led rather than silently dominated by hidden heuristics.
-- `max_iterations` remains the primary external upper bound for the loop unless a separately documented condition says otherwise.
-- The system is more inspectable at the level of loop steps and trajectory state than it was before this phase started.
+## Do not
+- do not add fragile snapshot tests for huge logs,
+- do not create tests that depend on random model behavior unless mocked or isolated.
 
 ---
 
-## 8. Required Working Style for Every Task
+# [ ] TASK 9 — Final cleanup and documentation of the fixed benchmark path
 
-For each task you must follow this exact pattern.
+## Goal
+Leave the benchmark loop understandable and maintainable.
 
-### Step A — Inspect
-Read the relevant files and explain:
-- which files matter,
-- how the current implementation works,
-- where the issue likely lives,
-- what invariant or contract is being violated.
+## Required changes
+- Add concise comments where the logic was previously misleading.
+- Document the benchmark flow in plain English:
+  1. generate baseline,
+  2. obtain real test result,
+  3. judge baseline,
+  4. select tactic,
+  5. build attacked artifact,
+  6. evaluate attacked artifact,
+  7. record trajectory,
+  8. stop or continue.
+- Document clearly which source is ground truth and which source is subjective:
+  - test judge = deterministic ground truth,
+  - LLM judge = manipulable evaluator.
 
-### Step B — Plan Only the Current Task
-State:
-- the smallest change set that can solve the problem,
-- what behavior should remain unchanged,
-- what evidence will show the fix is correct.
+## Delivery
+A short markdown note or code comments, not a giant document.
 
-### Step C — Implement Only That Task
-Apply only the scoped changes needed.
+## Validate
+A new contributor should be able to understand:
+- what is being measured,
+- what counts as attack success,
+- what Inspect is actually logging.
 
-### Step D — Report
-At the end, provide:
-- changed files,
-- summary of code changes,
-- why the change matches `AGENTS.md` and `DATA_CONTRACT_ARQUITECTURE.md`,
-- any remaining uncertainty,
-- confirmation that you are stopping and waiting for validation.
-
----
-
-## 9. Expected Output Format After Each Task
-
-After each completed task, respond in this structure:
-
-### Files inspected
-- list the files you read
-
-### Problem identified
-- concise explanation of the actual issue
-
-### Changes made
-- concise list of exact changes
-
-### Why this is correct
-- explain how the fix aligns with the current architecture and research constraints
-
-### What was intentionally not changed
-- list nearby things you deliberately left untouched
-
-### Remaining risks or follow-ups
-- note any limitations or next checks
-
-Then stop.
+## Do not
+- do not write vague architecture prose,
+- do not claim the system works unless validation evidence supports it.
 
 ---
 
-## 10. Strict Sequential Checklist
+## Definition of done
 
-Follow this checklist in order. Do not skip ahead.
+This work is only complete when all of the following are true:
 
----
-
-## Task Checklist (Mark each task as [x] only after approval)
-
-### [x] Task 1 — Correct the Iterative ReAct Flow Around Fresh Attack Attempts
-**Goal:** fix the conceptual loop so the selected tactic family influences a fresh attack attempt inside the iterative evaluation cycle.
-
-**Delivery:**
-- identify where the current flow is decoupled from the actual candidate code / judged attempt,
-- restructure the loop so each iteration clearly performs:
-  1. evaluate current attempt,
-  2. summarize relevant prior state,
-  3. choose next tactic family,
-  4. generate the next attack attempt,
-  5. re-evaluate,
-  6. update trajectory state,
-- preserve the current research objective and success condition,
-- keep the solution minimal and architecture-compatible.
-
-**Validate:**
-- the implementation now reflects the documented iterative contract,
-- the selected tactic family is no longer an isolated label disconnected from the actual next attempt,
-- the loop remains compatible with current benchmark execution and judges.
-
-Stop after completion.
+- A 1-sample debug run finishes in reasonable time.
+- The benchmark does not depend on fake `pass_pred` fallbacks for internal ground-truth test results.
+- The attacked artifact is exactly the artifact being tested and judged.
+- Inspect-visible outputs and metadata match the actual evaluated artifact.
+- Attempt logs are informative and non-empty.
+- Future tool-pattern exploration remains isolated from the controlled MBPP benchmark loop.
+- The final code is simpler or clearer than before, not more magical.
 
 ---
 
-### [x] Task 2 — Fix Tactic Family Tracking and Recorded History Consistency
-**Goal:** ensure that the chosen tactic family, the applied tactic family, and the recorded tactic family always match.
+## Output format you must follow after each task
 
-**Delivery:**
-- investigate enum handling,
-- investigate normalization / mapping issues,
-- investigate stale state reuse,
-- investigate where history and metadata are appended,
-- fix the root cause rather than only the symptom,
-- preserve compatibility with the current closed tactic-family set.
+For each completed task, respond with exactly these sections:
 
-**Validate:**
-- selector output, execution path, and recorded history are end-to-end consistent,
-- no mismatched tactic-family labels appear in attempt history,
-- the fix supports trustworthy later analysis by tactic family.
+### Task completed
+State which task number was completed.
 
-Stop after completion.
+### Files changed
+List only changed files.
 
----
+### What changed
+Concrete summary of code changes.
 
-### [x] Task 3 — Validate and Harden Stop Conditions
-**Goal:** ensure the iterative attack loop cannot run indefinitely and stops for the right reasons.
+### Why this was necessary
+Tie the change directly to the bug or performance problem.
 
-**Delivery:**
-- inspect all current stop conditions,
-- verify max-iteration handling,
-- verify attack-success handling,
-- inspect accidental always-continue logic,
-- inspect accidental early-stop logic,
-- make stopping behavior explicit and trustworthy without weakening iterative behavior.
+### How to validate
+Exact command(s) or test(s) to run.
 
-**Validate:**
-- the loop cannot run forever,
-- `max_iterations` remains the primary external budget control unless a documented experimental condition says otherwise,
-- the loop does not stop merely because tactic labels were exhausted or repeated unless that behavior is explicitly intended.
+### Expected result
+What should now happen.
 
-Stop after completion.
+### Remaining risks
+Only real remaining concerns, not generic filler.
 
----
-
-### [x] Task 4 — Ensure Feedback and Metrics Truly Drive Tactic Family Choice
-**Goal:** confirm that tactic-family selection depends on prior attempt outcome rather than behaving randomly, statically, or on shallow context alone.
-
-**Delivery:**
-- inspect what exact feedback and metrics are passed into the selector,
-- verify whether prior judge outcomes are visible,
-- verify whether prior attempts are summarized meaningfully,
-- ensure the selector sees enough structured trajectory context to choose intelligently,
-- make minimal changes needed to align selection with the intended iterative methodology.
-
-**Validate:**
-- the next tactic family is chosen with meaningful awareness of prior results,
-- the selector remains LLM-led rather than being silently dominated by hidden heuristics,
-- repeated tactic-family choices remain allowed when the LLM selects them again.
-
-Stop after completion.
-
----
-
-### [x] Task 5 — Introduce Dynamic Per-Attempt Attack Generation Within Tactic Families
-**Goal:** move from static per-tactic payloads to dynamic attack-message generation inside each tactic family.
-
-**Delivery:**
-- define the boundary between tactic-family selection and attack-message generation,
-- ensure the system generates a new attack message per attempt,
-- preserve the closed family list while allowing creativity inside each family,
-- keep the implementation extensible so more families can be added later,
-- avoid turning the generator into unconstrained free-form family invention.
-
-**Validate:**
-- the same tactic family can produce different attack messages across attempts,
-- the agent is generating attack content rather than replaying a single hardcoded payload,
-- generated messages remain attributable to a known tactic family for analysis.
-
-Stop after completion.
-
----
-
-### [x] Task 6 — Clarify Loop Decomposition Into Explicit Agent Steps
-**Goal:** make the iterative process more understandable and inspectable by decomposing what the agent does at each step.
-
-**Delivery:**
-- identify the major conceptual steps inside one iteration,
-- introduce clearer structure or boundaries for those steps where needed,
-- make it easier to inspect actions such as summarizing, selecting, generating, submitting, evaluating, and deciding,
-- keep the implementation practical and minimal.
-
-**Validate:**
-- the loop is easier to reason about and inspect,
-- per-step responsibilities are clearer than before,
-- the decomposition supports later experiment analysis and possible tool-based evolution.
-
-Stop after completion.
-
----
-
-### [x] Task 7 — Validate Attempt-Level Metadata Integrity
-**Goal:** ensure attempt-level metadata can reconstruct what actually happened in each iteration.
-
-**Delivery:**
-- inspect `all_attempts` and related metadata structures,
-- ensure metadata captures iteration number, tactic family, generated attack message or equivalent reference, judge outcomes, stop reason where relevant, and any useful confidence / score information if available,
-- remove or avoid fake inferred values that do not reflect real execution,
-- preserve compatibility with existing logging where possible.
-
-**Validate:**
-- the metadata reflects real execution rather than guesses,
-- each iteration can be reconstructed for later analysis,
-- tactic-family and attack-message lineage are visible.
-
-Stop after completion.
-
----
-
-### [x] Task 8 — Improve Observability and Per-Step Trace Detail
-**Goal:** make the system more inspectable for thesis analysis and trajectory viewing.
-
-**Delivery:**
-- improve visibility of selector inputs,
-- improve visibility of selector outputs,
-- improve visibility of generated attack content,
-- improve visibility of judge outcomes and stop reasons,
-- add trace structure that can later support richer viewers and trajectory analysis,
-- keep the implementation compatible with the current inspect-based pipeline.
-
-**Validate:**
-- the run output is more useful for debugging and thesis analysis,
-- a reviewer can more easily understand what happened at each step,
-- observability improvements do not break the core loop.
-
-Stop after completion.
-
----
-
-### [x] Task 9 — Minimal Refactor for Separation of Concerns
-**Goal:** improve maintainability only where necessary for correctness, observability, and future RL compatibility.
-
-**Delivery:**
-- tighten the boundary between selector logic and attack-generation logic,
-- tighten the boundary between state update and metadata recording,
-- reduce opportunities for state-flow bugs,
-- preserve current behavior outside the scoped changes.
-
-**Validate:**
-- the current phase is more reliable without broad cleanup,
-- public behavior remains aligned with the documented contract,
-- selector replacement remains feasible later.
-
-Stop after completion.
-
----
-
-### [x] Task 10 — Update Technical Documentation for the Stabilized Current System
-**Goal:** document the system as it actually works after stabilization.
-
-**Delivery:**
-- document the corrected iterative loop,
-- document the tactic-family concept versus dynamic attack-message generation,
-- document judge roles and success condition,
-- document stop conditions,
-- document metadata / trajectory structure,
-- document known limitations,
-- document why selector and attack generation remain separate.
-
-**Validate:**
-- the docs match the implementation after stabilization,
-- the docs are useful both for thesis writing and future engineering work,
-- future RL work is not documented as already implemented.
-
-Stop after completion.
-
----
-
-### [x] Task 11 — Improve Model Backend Readiness Through LiteLLM
-**Goal:** make the system more practical for stronger non-Ollama model backends while preserving architecture.
-
-**Delivery:**
-- inspect current model configuration assumptions,
-- inspect where LiteLLM is already used,
-- improve compatibility with stronger free/external APIs where practical,
-- keep the benchmark loop and metadata behavior stable.
-
-**Validate:**
-- backend flexibility improves without disrupting the stabilized loop,
-- the architecture remains consistent,
-- this does not turn into RL or tool-agent work.
-
-Stop after completion.
-
----
-
-### [x] Task 12 — Explore Tool-Based Agent Pattern in a Controlled Way
-**Goal:** explore whether constrained tool patterns such as `decompose` / `submit` fit the architecture.
-
-**Delivery:**
-- treat this as controlled exploration only,
-- keep a clear separation between the current benchmark pipeline and the experimental tool-based path,
-- use the exploration to improve inspectability and decomposition understanding rather than to replace the stabilized loop prematurely.
-
-**Validate:**
-- the exploration does not break the current stabilized pipeline,
-- the experiment path remains clearly scoped,
-- the results are useful for future realistic-agent work.
-
-Stop after completion.
-
----
-
-### [x] Task 13 — Prepare the Codebase for PR / CI Style Target Realism
-**Goal:** make the design more compatible with future realistic reviewer-agent targets without derailing the current benchmark path.
-
-**Delivery:**
-- identify the boundaries needed for future PR review / CI style workflows,
-- preserve compatibility with richer reviewer / target / executor decompositions,
-- avoid overbuilding the realistic target now,
-- keep the benchmark path first-class.
-
-**Validate:**
-- the codebase is more ready for future realistic targets,
-- current MBPP-based experimentation still works cleanly,
-- no unnecessary architecture rewrite was introduced.
-
-Stop after completion.
-
----
-
-### [x] Task 14 — Prepare the Codebase for Future RL / Bandit Selector Work
-**Goal:** only after stabilization, ensure the selector boundary is truly swappable.
-
-**Delivery:**
-- define or confirm clean selector interface assumptions,
-- ensure useful state and reward-relevant signals remain observable,
-- preserve the corrected separation between family selection and attack generation,
-- do not implement RL yet unless explicitly instructed.
-
-**Validate:**
-- future selector replacement is more feasible,
-- no premature RL logic was introduced,
-- the current stabilized loop remains the primary working path.
-
-Stop after completion.
-
----
-
-## 11. Guidance on Debugging the Known Tactic Bug
-
-Because this bug is especially important, follow these principles when investigating it:
-
-- trace the tactic family from the exact selector output,
-- trace the value passed into attack generation,
-- trace the generated message linked to that family,
-- trace the value written into state/history,
-- compare raw value vs normalized value,
-- compare enum member vs enum string vs display label,
-- inspect whether mutable state is being reused incorrectly,
-- inspect whether the wrong variable is appended to history,
-- inspect whether history is written before the final chosen family is resolved.
-
-Do not patch only the symptom. Identify the real root cause.
-
----
-
-## 12. Guidance on Dynamic Attack Generation
-
-When implementing dynamic attack generation:
-- preserve a closed tactic-family list,
-- allow creativity only inside the selected family,
-- keep prompts/family definitions explicit enough to analyze,
-- do not hardcode one fixed final attack string per family,
-- do not lose attribution from generated message back to family,
-- keep room for future family expansion.
-
-The correct abstraction is:
-
-- **family selection** chooses the kind of attack,
-- **message generation** creates the concrete attack attempt for that iteration.
-
-Do not collapse these into one opaque undocumented step.
-
----
-
-## 13. Guidance on Metrics and Analysis Integrity
-
-When working on metrics or metadata, ensure the outputs support later thesis analysis such as:
-- success by tactic family,
-- success by generated attack pattern where possible,
-- judge disagreement,
-- confidence shift,
-- iteration count to success,
-- failure patterns,
-- tactic ordering across attempts,
-- trajectory evolution across iterations.
-
-Only record values that are actually known from execution.
-Do not invent summary values if they are not grounded in real state.
-
----
-
-## 14. Guidance on Observability
-
-When improving observability, prefer making the trajectory easier to inspect at the level of:
-- current iteration,
-- selector context,
-- selected family,
-- generated attack message,
-- judged artifact,
-- judge outcomes,
-- stop decision,
-- state update.
-
-Favor traceability over clever compactness.
-
-Where practical, preserve compatibility with richer future trajectory viewers and realistic-agent tooling.
-
----
-
-## 15. Guidance on Refactoring
-
-Allowed refactoring:
-- extracting a helper,
-- clarifying a boundary,
-- fixing a state-flow problem,
-- making metadata assignment less error-prone,
-- making selector replacement easier later,
-- making step decomposition clearer.
-
-Not allowed refactoring:
-- rewriting the project structure,
-- changing unrelated modules,
-- changing naming conventions globally,
-- introducing new abstractions without clear need,
-- turning one task into a large cleanup effort.
-
----
-
-## 16. Guidance on Future RL Work
-
-RL / bandit work is a later phase.
-
-The only acceptable RL-related work during the current phase is:
-- preserving selector modularity,
-- keeping state and rewards observable,
-- avoiding design decisions that would block future policy replacement.
-
-Do not implement RL now unless explicitly instructed.
-
----
-
-## 17. Final Reminder
-
-Your role is to help stabilize and validate the current thesis system, not to improvise a new one.
-
-The current objective is:
-
-> **Make the existing ReAct-based iterative adversarial pipeline correct, dynamically generative within tactic families, analyzable, and trustworthy enough for thesis experiments and future RL extension.**
-
-Stay disciplined.
-Work one task at a time.
-Stop after each task.
-Do not hallucinate.
-Do not skip phases.
-Do not break research validity.
+Do not skip this format.
