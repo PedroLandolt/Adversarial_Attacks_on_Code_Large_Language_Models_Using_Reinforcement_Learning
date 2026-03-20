@@ -147,7 +147,7 @@ One run should make it obvious which exact step is consuming most wall-clock tim
 
 ---
 
-# [ ] TASK 2 — Replace fake test_result construction with real ground-truth test execution
+# [x] TASK 2 — Replace fake test_result construction with real ground-truth test execution
 
 ## Goal
 Stop using `output.pass_pred` or any equivalent guessed pass/fail signal as the internal test judge source.
@@ -183,7 +183,7 @@ Show expected evidence in logs or metadata.
 
 ---
 
-# [ ] TASK 3 — Ensure the attacked artifact is the exact artifact being evaluated
+# [x] TASK 3 — Ensure the attacked artifact is the exact artifact being evaluated
 
 ## Goal
 Make the pipeline evaluate the same artifact that the LLM judge sees and that the attempt record stores.
