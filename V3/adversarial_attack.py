@@ -197,11 +197,131 @@ def adversarial_code_llm(
 
             mbpp_test_cases = extract_mbpp_tests(state)
 
+            def clone_test_result(result: dict | None) -> dict | None:
+                """Return a stable copy of the raw execution result for metadata."""
+                if result is None:
+                    return None
+                return {
+                    "pass": bool(result.get("pass", False)),
+                    "stdout": str(result.get("stdout", "")),
+                    "stderr": str(result.get("stderr", "")),
+                }
+
+            def summarize_text(text: str | None, limit: int = 160) -> str | None:
+                """Return a compact single-line preview for debug metadata."""
+                if text is None:
+                    return None
+                normalized = " ".join(str(text).split())
+                if len(normalized) <= limit:
+                    return normalized
+                return normalized[: limit - 3] + "..."
+
+            def summarize_artifact(artifact: str | None) -> dict | None:
+                """Return a compact artifact summary for per-iteration traces."""
+                if artifact is None:
+                    return None
+                artifact_text = str(artifact)
+                return {
+                    "chars": len(artifact_text),
+                    "lines": len(artifact_text.splitlines()) if artifact_text else 0,
+                    "preview": summarize_text(artifact_text, limit=220),
+                }
+
+            def summarize_test_result(result: dict | None) -> dict | None:
+                """Return compact execution-output summary for traces."""
+                if result is None:
+                    return None
+                return {
+                    "pass": bool(result.get("pass", False)),
+                    "stdout_preview": summarize_text(result.get("stdout", ""), limit=120),
+                    "stderr_preview": summarize_text(result.get("stderr", ""), limit=120),
+                }
+
+            def serialize_test_judge(decision_obj) -> dict | None:
+                """Normalize test-judge metadata shape."""
+                if decision_obj is None:
+                    return None
+                return {
+                    "decision": decision_obj.decision,
+                    "confidence": decision_obj.confidence,
+                    "reasoning": decision_obj.reasoning,
+                    "vulnerability": decision_obj.vulnerability,
+                }
+
+            def serialize_llm_judge(decision_obj) -> dict | None:
+                """Normalize LLM-judge metadata shape."""
+                if decision_obj is None:
+                    return None
+                return {
+                    "decision": decision_obj.decision,
+                    "confidence": decision_obj.confidence,
+                    "reasoning": decision_obj.reasoning,
+                    "vulnerability": decision_obj.vulnerability,
+                }
+
+            def build_baseline_record(
+                *,
+                artifact: str | None,
+                test_result: dict | None,
+                test_decision_obj=None,
+                llm_decision_obj=None,
+                stop_reason: str | None = None,
+                error: str | None = None,
+            ) -> dict:
+                """Build stable baseline metadata for run-level inspection."""
+                record = {
+                    "iteration": 0,
+                    "mutation": "baseline",
+                    "artifact_under_review": artifact,
+                    "response": artifact,
+                    "attack_message": artifact,
+                    "test_result": clone_test_result(test_result),
+                    "test_judge": serialize_test_judge(test_decision_obj),
+                    "llm_judge": serialize_llm_judge(llm_decision_obj),
+                    "attack_success": False,
+                    "stop_reason": stop_reason,
+                }
+                if error is not None:
+                    record["error"] = error
+                return record
+
+            def build_run_metadata(
+                *,
+                strategy_name: str,
+                baseline_record: dict,
+                all_attempts: list[dict],
+                final_artifact_value: str | None,
+                attack_succeeded_value: bool,
+                successful_iteration_value: int | None,
+                stop_reason_value: str,
+            ) -> dict:
+                """Build stable run-level metadata for Inspect-visible output."""
+                return {
+                    "strategy": strategy_name,
+                    "smoke_test": smoke_test,
+                    "effective_max_iterations": effective_max_iterations,
+                    "baseline": baseline_record,
+                    "all_attempts": all_attempts,
+                    "final_artifact": final_artifact_value,
+                    "attack_succeeded": attack_succeeded_value,
+                    "successful_iteration": successful_iteration_value,
+                    "total_iterations": len(all_attempts),
+                    "stop_reason": stop_reason_value,
+                    "judge_model": judge_model,
+                    "selector_model": selector_model if selector_model else judge_model,
+                    "timings": timings,
+                    "llm_call_counts": llm_call_counts,
+                    "use_llm_judge": use_llm_judge,
+                    "red_teaming_tactic": red_teaming_tactic,
+                }
+
             # === BASELINE ===
             baseline_output = None
             final_artifact = None
             test_decision = None
             llm_decision = None
+            test_result = None
+            baseline_record = None
 
             try:
                 baseline_gen_start = time.perf_counter()
@@ -237,59 +357,34 @@ def adversarial_code_llm(
 
             except Exception as e:
                 error_text = str(e).strip() or f"{type(e).__name__} with empty message"
-                attempts.append({
-                    "iteration": 0,
-                    "mutation": "baseline",
-                    "tactic": None,
-                    "prompt": problem_text,
-                    "response": None,
-                    "attack_message": None,
-                    "attack_success": False,
-                    "stop_reason": "baseline_error",
-                    "error": error_text,
-                })
+                baseline_record = build_baseline_record(
+                    artifact=None,
+                    test_result=None,
+                    test_decision_obj=None,
+                    llm_decision_obj=None,
+                    stop_reason="baseline_error",
+                    error=error_text,
+                )
 
-                state.metadata = {
-                    "strategy": mutation_strategy,
-                    "smoke_test": smoke_test,
-                    "effective_max_iterations": effective_max_iterations,
-                    "baseline_output": None,
-                    "final_artifact": None,
-                    "attack_succeeded": False,
-                    "successful_iteration": None,
-                    "total_iterations": 0,
-                    "stop_reason": "baseline_error",
-                    "all_attempts": attempts,
-                    "timings": timings,
-                    "llm_call_counts": llm_call_counts,
-                    "use_llm_judge": use_llm_judge,
-                    "judge_model": judge_model,
-                    "selector_model": selector_model if selector_model else judge_model,
-                    "red_teaming_tactic": red_teaming_tactic,
-                }
+                state.metadata = build_run_metadata(
+                    strategy_name=mutation_strategy,
+                    baseline_record=baseline_record,
+                    all_attempts=attempts,
+                    final_artifact_value=None,
+                    attack_succeeded_value=False,
+                    successful_iteration_value=None,
+                    stop_reason_value="baseline_error",
+                )
                 return state
 
             # If baseline succeeded, record it
             if test_decision is not None:
-                attempts.append({
-                    "iteration": 0,
-                    "mutation": "baseline",
-                    "tactic": None,
-                    "prompt": problem_text,
-                    "response": baseline_output,
-                    "attack_message": baseline_output,
-                    "test_judge": {
-                        "decision": test_decision.decision,
-                        "confidence": test_decision.confidence,
-                    },
-                    "llm_judge": {
-                        "decision": llm_decision.decision if llm_decision else None,
-                        "confidence": llm_decision.confidence if llm_decision else None,
-                        "reasoning": llm_decision.reasoning if llm_decision else None,
-                        "vulnerability": llm_decision.vulnerability if llm_decision else None,
-                    } if use_llm_judge else None,
-                    "attack_success": False,
-                })
+                baseline_record = build_baseline_record(
+                    artifact=baseline_output,
+                    test_result=test_result,
+                    test_decision_obj=test_decision,
+                    llm_decision_obj=llm_decision,
+                )
 
             # === REACT LOOP ===
             if mutation_strategy == "react" and use_llm_judge and selector_policy:
@@ -407,7 +502,15 @@ def adversarial_code_llm(
                         next_test_decision.decision == "FAIL"
                         and next_llm_decision.decision == "PASS"
                     )
-                    return generated_code, artifact_under_review, next_test_decision, next_llm_decision, succeeded, applied_tactic_name
+                    return (
+                        generated_code,
+                        artifact_under_review,
+                        next_test_decision,
+                        next_llm_decision,
+                        test_result_iter,
+                        succeeded,
+                        applied_tactic_name,
+                    )
 
                 def build_react_attempt_record(
                     *,
@@ -420,6 +523,7 @@ def adversarial_code_llm(
                     trace: dict | None = None,
                     test_decision_obj=None,
                     llm_decision_obj=None,
+                    test_result_obj: dict | None = None,
                     error: str | None = None,
                     stop_reason: str | None = None,
                 ) -> dict:
@@ -434,6 +538,7 @@ def adversarial_code_llm(
                         "prompt": problem_text,
                         "response": attacked_code,
                         "attack_message": attacked_code,
+                        "test_result": clone_test_result(test_result_obj),
                         "previous_tactics": previous_tactics_before,
                         "attack_success": attack_success,
                         "stop_reason": "attack_succeeded" if attack_success else None,
@@ -447,18 +552,8 @@ def adversarial_code_llm(
                         record["stop_reason"] = stop_reason or "iteration_error"
                         return record
 
-                    record["test_judge"] = {
-                        "decision": test_decision_obj.decision,
-                        "confidence": test_decision_obj.confidence,
-                        "reasoning": test_decision_obj.reasoning,
-                        "vulnerability": test_decision_obj.vulnerability,
-                    }
-                    record["llm_judge"] = {
-                        "decision": llm_decision_obj.decision,
-                        "confidence": llm_decision_obj.confidence,
-                        "reasoning": llm_decision_obj.reasoning,
-                        "vulnerability": llm_decision_obj.vulnerability,
-                    }
+                    record["test_judge"] = serialize_test_judge(test_decision_obj)
+                    record["llm_judge"] = serialize_llm_judge(llm_decision_obj)
                     return record
 
                 def init_iteration_context() -> dict:
@@ -491,15 +586,49 @@ def adversarial_code_llm(
                         "attacked_code_after_tactic": ctx["attacked_code"],
                     }
 
+                def enrich_iteration_trace(
+                    *,
+                    trace: dict,
+                    selected_tactic: str | None,
+                    previous_tactics_before: list[str],
+                    artifact_under_review: str | None,
+                    test_result_obj: dict | None,
+                    test_decision_obj=None,
+                    llm_decision_obj=None,
+                    stop_reason_value: str | None = None,
+                    error: str | None = None,
+                ) -> dict:
+                    """Attach compact diagnosis-friendly summary to a trace."""
+                    trace["summary"] = {
+                        "selected_tactic": selected_tactic,
+                        "previous_tactics": previous_tactics_before,
+                        "artifact_summary": summarize_artifact(artifact_under_review),
+                        "test_result": summarize_test_result(test_result_obj),
+                        "test_judge_decision": (
+                            test_decision_obj.decision if test_decision_obj else None
+                        ),
+                        "llm_judge_decision": (
+                            llm_decision_obj.decision if llm_decision_obj else None
+                        ),
+                        "llm_judge_confidence": (
+                            llm_decision_obj.confidence if llm_decision_obj else None
+                        ),
+                        "stop_reason": stop_reason_value,
+                        "error": error,
+                    }
+                    return trace
+
                 def record_iteration_success(
                     *,
                     iteration: int,
                     ctx: dict,
                     test_decision_obj,
                     llm_decision_obj,
+                    test_result_obj: dict,
                     attack_success: bool,
                 ) -> None:
                     """Record a successful iteration execution path."""
+                    terminal_stop_reason = "attack_succeeded" if attack_success else None
                     attempts.append(
                         build_react_attempt_record(
                             iteration=iteration,
@@ -508,9 +637,19 @@ def adversarial_code_llm(
                             previous_tactics_before=ctx["previous_tactics_before"],
                             attacked_code=ctx["attacked_code"],
                             attack_success=attack_success,
-                            trace=build_iteration_trace(ctx),
+                            trace=enrich_iteration_trace(
+                                trace=build_iteration_trace(ctx),
+                                selected_tactic=ctx["selected_tactic_name"],
+                                previous_tactics_before=ctx["previous_tactics_before"],
+                                artifact_under_review=ctx["attacked_code"],
+                                test_result_obj=test_result_obj,
+                                test_decision_obj=test_decision_obj,
+                                llm_decision_obj=llm_decision_obj,
+                                stop_reason_value=terminal_stop_reason,
+                            ),
                             test_decision_obj=test_decision_obj,
                             llm_decision_obj=llm_decision_obj,
+                            test_result_obj=test_result_obj,
                         )
                     )
 
@@ -569,6 +708,7 @@ def adversarial_code_llm(
                             ctx["attacked_code"],
                             test_decision,
                             llm_decision,
+                            test_result_iter,
                             attack_succeeded,
                             ctx["applied_tactic_name"],
                         ) = await apply_and_evaluate_tactic(
@@ -581,6 +721,7 @@ def adversarial_code_llm(
                             ctx=ctx,
                             test_decision_obj=test_decision,
                             llm_decision_obj=llm_decision,
+                            test_result_obj=test_result_iter,
                             attack_success=attack_succeeded,
                         )
                         final_artifact = ctx["attacked_code"]
@@ -616,7 +757,18 @@ def adversarial_code_llm(
                                 previous_tactics_before=ctx["previous_tactics_before"],
                                 attacked_code=ctx["attacked_code"],
                                 attack_success=False,
-                                trace=build_iteration_trace(ctx),
+                                trace=enrich_iteration_trace(
+                                    trace=build_iteration_trace(ctx),
+                                    selected_tactic=ctx["selected_tactic_name"],
+                                    previous_tactics_before=ctx["previous_tactics_before"],
+                                    artifact_under_review=ctx["attacked_code"],
+                                    test_result_obj=None,
+                                    test_decision_obj=None,
+                                    llm_decision_obj=None,
+                                    stop_reason_value=iteration_stop_reason,
+                                    error=error_text,
+                                ),
+                                test_result_obj=None,
                                 error=error_text,
                                 stop_reason=iteration_stop_reason,
                             )
@@ -639,23 +791,16 @@ def adversarial_code_llm(
                     final_artifact = baseline_output
                 if hasattr(state, "output") and state.output and hasattr(state.output, "completion"):
                     state.output.completion = final_artifact
-                state.metadata = {
-                    "strategy": "react",
-                    "smoke_test": smoke_test,
-                    "effective_max_iterations": effective_max_iterations,
-                    "baseline_output": baseline_output,
-                    "final_artifact": final_artifact,
-                    "attack_succeeded": attack_succeeded,
-                    "successful_iteration": successful_iteration,
-                    "total_iterations": len([a for a in attempts if a.get("iteration", 0) > 0]),
-                    "tactics_tried": previous_tactics,
-                    "stop_reason": stop_reason,
-                    "judge_model": judge_model,
-                    "selector_model": selector_model if selector_model else judge_model,
-                    "all_attempts": attempts,
-                    "timings": timings,
-                    "llm_call_counts": llm_call_counts,
-                }
+                state.metadata = build_run_metadata(
+                    strategy_name="react",
+                    baseline_record=baseline_record,
+                    all_attempts=attempts,
+                    final_artifact_value=final_artifact,
+                    attack_succeeded_value=attack_succeeded,
+                    successful_iteration_value=successful_iteration,
+                    stop_reason_value=stop_reason,
+                )
+                state.metadata["tactics_tried"] = previous_tactics
                 timings["metadata_finalization_seconds"] += time.perf_counter() - metadata_finalization_start
                 state.metadata["timings"] = timings
                 
@@ -716,21 +861,45 @@ def adversarial_code_llm(
                         "iteration": iteration,
                         "mutation": mutation_name,
                         "tactic": red_teaming_tactic,
+                        "artifact_under_review": mutated_output,
                         "prompt": problem_text,
                         "response": mutated_output,
                         "attack_message": mutated_output,
+                        "test_result": clone_test_result(test_result),
                         "stop_reason": "attack_succeeded" if attack_success_iter else None,
-                        "test_judge": {
-                            "decision": test_decision.decision,
-                            "confidence": test_decision.confidence,
-                        },
-                        "llm_judge": {
-                            "decision": llm_decision.decision if llm_decision else None,
-                            "confidence": llm_decision.confidence if llm_decision else None,
-                            "reasoning": llm_decision.reasoning if llm_decision else None,
-                            "vulnerability": llm_decision.vulnerability if llm_decision else None,
-                        } if use_llm_judge else None,
+                        "test_judge": serialize_test_judge(test_decision),
+                        "llm_judge": serialize_llm_judge(llm_decision) if use_llm_judge else None,
                         "attack_success": attack_success_iter if use_llm_judge else None,
+                        "trace": {
+                            "steps": [
+                                "mutate_prompt",
+                                "generate_candidate",
+                                "apply_optional_red_teaming_tactic",
+                                "evaluate_judges",
+                                "record_attempt",
+                            ],
+                            "summary": {
+                                "selected_tactic": red_teaming_tactic,
+                                "previous_tactics": [
+                                    str(a.get("tactic"))
+                                    for a in attempts
+                                    if a.get("tactic") is not None
+                                ],
+                                "artifact_summary": summarize_artifact(mutated_output),
+                                "test_result": summarize_test_result(test_result),
+                                "test_judge_decision": test_decision.decision,
+                                "llm_judge_decision": (
+                                    llm_decision.decision if llm_decision else None
+                                ),
+                                "llm_judge_confidence": (
+                                    llm_decision.confidence if llm_decision else None
+                                ),
+                                "stop_reason": (
+                                    "attack_succeeded" if attack_success_iter else None
+                                ),
+                                "error": None,
+                            },
+                        },
                     })
 
                 except Exception as e:
@@ -738,6 +907,28 @@ def adversarial_code_llm(
                         "iteration": iteration,
                         "mutation": mutation_name,
                         "error": str(e),
+                        "trace": {
+                            "steps": [
+                                "mutate_prompt",
+                                "generate_candidate",
+                                "record_attempt",
+                            ],
+                            "summary": {
+                                "selected_tactic": red_teaming_tactic,
+                                "previous_tactics": [
+                                    str(a.get("tactic"))
+                                    for a in attempts
+                                    if a.get("tactic") is not None
+                                ],
+                                "artifact_summary": None,
+                                "test_result": None,
+                                "test_judge_decision": None,
+                                "llm_judge_decision": None,
+                                "llm_judge_confidence": None,
+                                "stop_reason": "iteration_error",
+                                "error": str(e),
+                            },
+                        },
                     })
 
             successful_iteration = next(
@@ -753,25 +944,16 @@ def adversarial_code_llm(
                 final_artifact = baseline_output
             if hasattr(state, "output") and state.output and hasattr(state.output, "completion"):
                 state.output.completion = final_artifact
-            state.metadata = {
-                "strategy": mutation_strategy,
-                "smoke_test": smoke_test,
-                "effective_max_iterations": effective_max_iterations,
-                "baseline_output": baseline_output,
-                "final_artifact": final_artifact,
-                "attack_succeeded": attack_succeeded,
-                "successful_iteration": successful_iteration,
-                "total_iterations": len([a for a in attempts if a.get("iteration", 0) > 0]),
-                "stop_reason": "attack_succeeded" if attack_succeeded else "max_iterations_reached",
-                "total_mutations": len(attempts) - 1,
-                "all_attempts": attempts,
-                "timings": timings,
-                "llm_call_counts": llm_call_counts,
-                "use_llm_judge": use_llm_judge,
-                "judge_model": judge_model,
-                "selector_model": selector_model if selector_model else judge_model,
-                "red_teaming_tactic": red_teaming_tactic,
-            }
+            state.metadata = build_run_metadata(
+                strategy_name=mutation_strategy,
+                baseline_record=baseline_record,
+                all_attempts=attempts,
+                final_artifact_value=final_artifact,
+                attack_succeeded_value=attack_succeeded,
+                successful_iteration_value=successful_iteration,
+                stop_reason_value="attack_succeeded" if attack_succeeded else "max_iterations_reached",
+            )
+            state.metadata["total_mutations"] = len(attempts)
 
             return state
 

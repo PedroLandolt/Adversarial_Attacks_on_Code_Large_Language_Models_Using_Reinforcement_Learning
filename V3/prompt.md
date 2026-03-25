@@ -273,7 +273,7 @@ Expected result:
 
 ---
 
-# [ ] TASK 4 — Align final state, metadata, and Inspect-visible output
+# [x] TASK 4 — Align final state, metadata, and Inspect-visible output
 
 ## Goal
 Make Inspect logs and stored metadata reflect what actually happened.
