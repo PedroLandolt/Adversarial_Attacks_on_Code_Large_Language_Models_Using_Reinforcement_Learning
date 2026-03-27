@@ -308,7 +308,7 @@ After one debug run, the log should clearly answer:
 
 ---
 
-# [ ] TASK 5 — Improve observability without changing benchmark semantics
+# [x] TASK 5 — Improve observability without changing benchmark semantics
 
 ## Goal
 Make failures diagnosable in one run.
@@ -346,7 +346,7 @@ A single failed run should make it obvious whether the problem came from:
 
 ---
 
-# [ ] TASK 6 — Keep future-facing tool exploration isolated from MBPP benchmark execution
+# [x] TASK 6 — Keep future-facing tool exploration isolated from MBPP benchmark execution
 
 ## Goal
 Guarantee that MBPP benchmark stabilization is not polluted by tool-pattern experimentation.
@@ -372,7 +372,7 @@ If yes, show the minimal fix that removes it from the hot path.
 
 ---
 
-# [ ] TASK 7 — Performance audit after correctness is restored
+# [x] TASK 7 — Performance audit after correctness is restored
 
 ## Goal
 Only after correctness is fixed, remove avoidable latency from the benchmark loop.

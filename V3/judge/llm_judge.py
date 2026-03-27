@@ -18,6 +18,7 @@ from inspect_ai.model import get_model, ChatMessageUser
 from dataclasses import dataclass
 import json
 import re
+from typing import Any
 
 
 @dataclass
@@ -35,12 +36,16 @@ class LLMJudge:
     Can be manipulated by red-teaming tactics.
     """
 
-    def __init__(self, judge_model: str = "ollama/qwen2.5:7b"):
+    def __init__(self, judge_model: str | Any = "ollama/qwen2.5:7b"):
         """
         Args:
             judge_model: Model to use for judging (via inspect_ai)
         """
-        self.judge_model = get_model(judge_model)
+        self.judge_model = (
+            judge_model
+            if hasattr(judge_model, "generate")
+            else get_model(judge_model)
+        )
 
     async def evaluate(
         self,

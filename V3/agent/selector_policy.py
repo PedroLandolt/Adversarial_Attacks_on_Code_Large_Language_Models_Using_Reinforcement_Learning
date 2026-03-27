@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Protocol
+from typing import Any
 
 from agent.react_selector import ReactTacticSelector
 
@@ -46,7 +47,7 @@ class SelectorPolicy(Protocol):
 class ReactSelectorPolicy:
     """Adapter that exposes ReactTacticSelector via SelectorPolicy interface."""
 
-    def __init__(self, selector_model: str):
+    def __init__(self, selector_model: str | Any):
         self._selector = ReactTacticSelector(selector_model)
 
     async def select(self, context: SelectorContext) -> SelectorDecision:

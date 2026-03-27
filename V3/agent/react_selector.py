@@ -5,6 +5,7 @@ ReAct tactic selector - chooses which red-teaming tactic to apply based on feedb
 from inspect_ai.model import get_model, ChatMessageUser, GenerateConfig
 from enum import Enum
 import re
+from typing import Any
 
 
 class TacticChoice(Enum):
@@ -23,9 +24,13 @@ class ReactTacticSelector:
     based on previous judge feedback and reasoning about what might work next.
     """
     
-    def __init__(self, selector_model: str = "ollama/qwen2.5:7b"):
+    def __init__(self, selector_model: str | Any = "ollama/qwen2.5:7b"):
         """Initialize with a selector model."""
-        self.selector_model = get_model(selector_model)
+        self.selector_model = (
+            selector_model
+            if hasattr(selector_model, "generate")
+            else get_model(selector_model)
+        )
 
     def _extract_tactic_choice(self, raw_response: str) -> TacticChoice | None:
         """Normalize selector output into a single valid tactic enum."""

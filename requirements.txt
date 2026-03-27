@@ -1,0 +1,8 @@
+# Python dependencies for the thesis project.
+# Recommended Python version: >= 3.10
+
+inspect-ai>=0.1.0
+litellm>=1.3.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+inspect-evals>=0.1.0
