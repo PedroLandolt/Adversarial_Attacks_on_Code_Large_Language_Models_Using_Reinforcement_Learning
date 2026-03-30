@@ -599,7 +599,7 @@ Show that the current four tactics still work through the new registry contract.
 
 ---
 
-# [ ] TASK 13 — Expand benchmark attack rendering from the current four tactics to the broader taxonomy
+# [x] TASK 13 — Expand benchmark attack rendering from the current four tactics to the broader taxonomy
 
 ## Goal
 Make the benchmark path use the broader red-teaming taxonomy rather than only the current four tactic families.

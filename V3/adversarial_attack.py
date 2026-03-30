@@ -488,6 +488,21 @@ def adversarial_code_llm(
                     "vulnerability": decision_obj.vulnerability,
                 }
 
+            def serialize_tactic_action(tactic_name: str | None) -> dict | None:
+                """Return registry-backed tactic metadata for attempt records."""
+                if tactic_name is None:
+                    return None
+                try:
+                    entry = get_tactic_entry(tactic_name, environment="benchmark")
+                except ValueError:
+                    return None
+                return {
+                    "tactic_id": entry.tactic_id,
+                    "tactic_family": entry.tactic_family,
+                    "renderer_binding": entry.renderer_binding,
+                    "taxonomy_category": entry.taxonomy_category,
+                }
+
             def build_baseline_record(
                 *,
                 artifact_bundle: dict | None,
@@ -678,7 +693,7 @@ def adversarial_code_llm(
                     llm_result_snapshot,
                     attempts_history: list[dict],
                     ctx: dict,
-                ) -> tuple[dict, str, str]:
+                ) -> tuple[dict, dict, str]:
                     """Select and normalize tactic for one iteration."""
                     selector_input = build_selector_payload(
                         iteration,
@@ -695,7 +710,29 @@ def adversarial_code_llm(
                         SelectorContext(**selector_input)
                     )
                     timings["selector_call_seconds"].append(time.perf_counter() - selector_call_start)
-                    selector_output = selector_decision.tactic_family
+                    selector_entry = get_tactic_entry(
+                        selector_decision.tactic_family,
+                        environment="benchmark",
+                    )
+                    selector_output = {
+                        "tactic_id": getattr(selector_decision, "tactic_id", selector_entry.tactic_id),
+                        "tactic_family": selector_decision.tactic_family,
+                        "renderer_binding": getattr(
+                            selector_decision,
+                            "renderer_binding",
+                            selector_entry.renderer_binding,
+                        ),
+                        "taxonomy_category": getattr(
+                            selector_decision,
+                            "taxonomy_category",
+                            selector_entry.taxonomy_category,
+                        ),
+                        "environment_support": getattr(
+                            selector_decision,
+                            "environment_support",
+                            selector_entry.environment_support,
+                        ),
+                    }
                     selected_tactic_name = normalize_tactic_name(
                         selector_decision.tactic_family
                     )
@@ -796,6 +833,8 @@ def adversarial_code_llm(
                         "tactic": applied_tactic_name,
                         "selected_tactic": selected_tactic_name,
                         "applied_tactic": applied_tactic_name,
+                        "selected_tactic_action": serialize_tactic_action(selected_tactic_name),
+                        "applied_tactic_action": serialize_tactic_action(applied_tactic_name),
                         "raw_completion": artifact_bundle.get("raw_completion"),
                         "executable_code": artifact_bundle.get("executable_code"),
                         "review_artifact": artifact_bundle.get("review_artifact"),
@@ -961,6 +1000,8 @@ def adversarial_code_llm(
                         "selected_tactic": ctx["selected_tactic_name"],
                         "applied_tactic": ctx["applied_tactic_name"],
                         "tactic": ctx["applied_tactic_name"],
+                        "selected_tactic_action": serialize_tactic_action(ctx["selected_tactic_name"]),
+                        "applied_tactic_action": serialize_tactic_action(ctx["applied_tactic_name"]),
                         "test_decision": test_decision_obj.decision,
                         "test_confidence": test_decision_obj.confidence,
                         "llm_decision": llm_decision_obj.decision,
@@ -1204,6 +1245,8 @@ def adversarial_code_llm(
                         "iteration": iteration,
                         "mutation": mutation_name,
                         "tactic": red_teaming_tactic,
+                        "selected_tactic_action": serialize_tactic_action(red_teaming_tactic),
+                        "applied_tactic_action": serialize_tactic_action(red_teaming_tactic),
                         "failure_stage": failure_stage,
                         "raw_completion": artifact_bundle["raw_completion"],
                         "executable_code": artifact_bundle["executable_code"],
@@ -1263,6 +1306,7 @@ def adversarial_code_llm(
                     attempts.append({
                         "iteration": iteration,
                         "mutation": mutation_name,
+                        "selected_tactic_action": serialize_tactic_action(red_teaming_tactic),
                         "failure_stage": canonical_failure_stage,
                         "error": error_text,
                         "trace": {

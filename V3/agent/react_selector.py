@@ -60,12 +60,7 @@ class ReactTacticSelector:
 
     def _fallback_tactic_choice(self, previous_attempts: list[dict]) -> TacticChoice:
         """Choose a safe registry-backed action when model output cannot be parsed."""
-        ordered = [
-            get_tactic_entry("semantic", self.environment),
-            get_tactic_entry("injection", self.environment),
-            get_tactic_entry("output", self.environment),
-            get_tactic_entry("cot", self.environment),
-        ]
+        ordered = list(self.available_actions)
         used = {
             str(
                 attempt.get("applied_tactic")
@@ -78,7 +73,7 @@ class ReactTacticSelector:
         for action in ordered:
             if action.tactic_family not in used and action.tactic_id not in used:
                 return action
-        return get_tactic_entry("semantic", self.environment)
+        return self.available_actions[0]
 
     async def select_tactic(
         self,

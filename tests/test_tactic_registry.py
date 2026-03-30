@@ -90,9 +90,13 @@ from judge.red_teaming_tactics import apply_tactic, get_all_tactics
 
 
 class TacticRegistryTests(unittest.IsolatedAsyncioTestCase):
-    def test_registry_exposes_four_legacy_tactics_with_required_fields(self):
+    def test_registry_exposes_legacy_and_taxonomy_benchmark_tactics(self):
         entries = get_tactic_registry("benchmark")
-        self.assertEqual([entry.tactic_family for entry in entries], ["injection", "output", "semantic", "cot"])
+        families = [entry.tactic_family for entry in entries]
+        for legacy_family in ("injection", "output", "semantic", "cot"):
+            self.assertIn(legacy_family, families)
+        for taxonomy_family in ("roleplay", "appeal_to_authority", "formatting_smuggling", "recursion_crescendo", "crowding"):
+            self.assertIn(taxonomy_family, families)
         for entry in entries:
             self.assertTrue(entry.tactic_id)
             self.assertTrue(entry.tactic_family)
@@ -118,6 +122,35 @@ class TacticRegistryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(decision.tactic_id, "legacy_semantic")
         self.assertEqual(decision.renderer_binding, "semantic_inconsistency")
         self.assertIn("benchmark", decision.environment_support)
+
+    async def test_non_legacy_taxonomy_action_can_be_selected_and_rendered(self):
+        class RoleplayModel:
+            async def generate(self, *args, **kwargs):
+                return SimpleNamespace(completion="roleplay")
+
+        policy = ReactSelectorPolicy(selector_model=RoleplayModel(), environment="benchmark")
+        decision = await policy.select(
+            SelectorContext(
+                problem="Write increment.",
+                current_code="def increment(x):\n    return x + 1\n",
+                test_judge_decision="FAIL",
+                llm_judge_decision="FAIL",
+                llm_judge_confidence=0.2,
+                iteration=1,
+                max_iterations=3,
+                previous_attempts=[],
+            )
+        )
+
+        rendered = apply_tactic(
+            "def increment(x):\n    return x + 1\n",
+            decision.tactic_family,
+            problem="Write increment.",
+        )
+        self.assertEqual(decision.tactic_family, "roleplay")
+        self.assertEqual(decision.tactic_id, "taxonomy_roleplay")
+        self.assertEqual(decision.taxonomy_category, "narrative_contextual")
+        self.assertIn("Reviewer simulation mode.", rendered)
 
     def test_registry_and_renderer_keep_legacy_four_tactics_working(self):
         code = "def add_one(x):\n    return x + 1\n"

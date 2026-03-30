@@ -37,6 +37,7 @@ class SelectorDecision:
     tactic_family: str
     environment_support: tuple[str, ...]
     renderer_binding: str
+    taxonomy_category: str | None
     selector_name: str
     reasoning: str | None = None
 
@@ -71,6 +72,7 @@ class ReactSelectorPolicy:
             tactic_family=chosen.tactic_family,
             environment_support=chosen.environment_support,
             renderer_binding=chosen.renderer_binding,
+            taxonomy_category=chosen.taxonomy_category,
             selector_name="react",
             reasoning=None,
         )
