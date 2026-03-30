@@ -55,6 +55,11 @@ from judge.llm_judge import LLMJudge
 from judge.test_judge import test_judge
 from judge.red_teaming_tactics import apply_tactic
 from agent.selector_policy import ReactSelectorPolicy, SelectorContext
+from utils.benchmark_loader import (
+    build_verification_program,
+    extract_benchmark_spec,
+    load_benchmark_task,
+)
 
 import json
 import os
@@ -67,6 +72,7 @@ from copy import deepcopy
 
 @task
 def adversarial_code_llm(
+    benchmark: str = "mbpp",
     temperature: float = 0.5,
     max_iterations: int = 5,
     epochs: int = 1,
@@ -89,7 +95,7 @@ def adversarial_code_llm(
     - "react": ReAct loop with LLM selector choosing red-teaming tactics
     """
 
-    base_task = mbpp(temperature=temperature)
+    base_task = load_benchmark_task(benchmark, temperature=temperature)
 
     # Heuristic mutators (for random/sequential strategies)
     mutators = []
@@ -140,24 +146,12 @@ def adversarial_code_llm(
                 "total": 0,
             }
 
-            # Extract problem
-            problem_text = str(state.messages[0].content) if state.messages else state.input_text
+            benchmark_spec = extract_benchmark_spec(state, benchmark)
+            problem_text = benchmark_spec.problem_text
             python_code_block_pattern = re.compile(r"```(?:python)?\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
             python_start_pattern = re.compile(
                 r"^\s*(def |class |from |import |async def |@|if __name__ == [\"']__main__[\"']:)"
             )
-
-            def extract_mbpp_tests(task_state: TaskState) -> list[str]:
-                metadata = getattr(task_state, "metadata", {}) or {}
-                test_list = metadata.get("test_list")
-                if isinstance(test_list, list) and test_list:
-                    return [str(test_case) for test_case in test_list]
-
-                target = getattr(task_state, "target", None)
-                if isinstance(target, list) and target:
-                    return [str(test_case) for test_case in target]
-
-                return []
 
             def _try_parse_python(candidate: str) -> str | None:
                 """Return candidate if it parses as Python, else None."""
@@ -206,20 +200,17 @@ def adversarial_code_llm(
 
                 return raw_text
 
-            async def execute_mbpp_tests(executable_code: str, test_cases: list[str]) -> dict:
-                if not test_cases:
+            async def execute_benchmark_tests(executable_code: str | None, sample_spec) -> dict:
+                verification_program = build_verification_program(executable_code, sample_spec)
+                if verification_program is None:
                     return {
                         "pass": False,
                         "stdout": "",
-                        "stderr": "No MBPP tests found in sample state.",
+                        "stderr": (
+                            f"No deterministic tests found for benchmark "
+                            f"'{sample_spec.benchmark_name}'."
+                        ),
                     }
-
-                verification_program_parts = [str(executable_code)]
-                for test_case in test_cases:
-                    verification_program_parts.append(
-                        f"{test_case}, {repr(test_case[len('assert ') :])}"
-                    )
-                verification_program = "\n".join(verification_program_parts)
 
                 try:
                     exec_result = await sandbox().exec(
@@ -237,8 +228,6 @@ def adversarial_code_llm(
                         "stdout": "",
                         "stderr": "Verification timed out.",
                     }
-
-            mbpp_test_cases = extract_mbpp_tests(state)
 
             def clone_test_result(result: dict | None) -> dict | None:
                 """Return a stable copy of the raw execution result for metadata."""
@@ -545,6 +534,14 @@ def adversarial_code_llm(
                     "strategy": strategy_name,
                     "smoke_test": smoke_test,
                     "effective_max_iterations": effective_max_iterations,
+                    "benchmark": benchmark_spec.benchmark_name,
+                    "benchmark_spec": {
+                        "benchmark_name": benchmark_spec.benchmark_name,
+                        "entry_point": benchmark_spec.entry_point,
+                        "test_list": benchmark_spec.test_list,
+                        "test_harness": benchmark_spec.test_harness,
+                        "normalization_requirements": benchmark_spec.normalization_requirements,
+                    },
                     "baseline": baseline_record,
                     "all_attempts": all_attempts,
                     "attempt_history_compact": build_attempt_history_compact(all_attempts),
@@ -590,9 +587,9 @@ def adversarial_code_llm(
                 final_artifact_bundle = baseline_artifact_bundle
 
                 # Deterministic execution remains the ground-truth benchmark signal.
-                test_result = await execute_mbpp_tests(
+                test_result = await execute_benchmark_tests(
                     baseline_artifact_bundle["executable_code"],
-                    mbpp_test_cases,
+                    benchmark_spec,
                 )
                 test_decision = test_judge(test_result)
 
@@ -748,9 +745,9 @@ def adversarial_code_llm(
                         state.output.completion = artifact_under_review
 
                     ctx["failure_stage"] = "test_execution"
-                    test_result_iter = await execute_mbpp_tests(
+                    test_result_iter = await execute_benchmark_tests(
                         artifact_bundle["executable_code"],
-                        mbpp_test_cases,
+                        benchmark_spec,
                     )
                     next_test_decision = test_judge(test_result_iter)
                     ctx["failure_stage"] = "llm_judge"
@@ -1167,9 +1164,9 @@ def adversarial_code_llm(
 
                     # Test judge
                     failure_stage = "test_execution"
-                    test_result = await execute_mbpp_tests(
+                    test_result = await execute_benchmark_tests(
                         artifact_bundle["executable_code"],
-                        mbpp_test_cases,
+                        benchmark_spec,
                     )
                     test_decision = test_judge(test_result)
 

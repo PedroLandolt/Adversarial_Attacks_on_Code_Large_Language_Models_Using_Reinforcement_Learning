@@ -544,7 +544,7 @@ One MBPP debug run must clearly show:
 
 ---
 
-# [ ] TASK 11 — Generalize benchmark loading so MBPP and HumanEval use one contract
+# [x] TASK 11 — Generalize benchmark loading so MBPP and HumanEval use one contract
 
 ## Goal
 Make MBPP and HumanEval first-class benchmark environments under one common benchmark adapter contract.
