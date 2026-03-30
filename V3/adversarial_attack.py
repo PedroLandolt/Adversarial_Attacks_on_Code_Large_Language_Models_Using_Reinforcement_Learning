@@ -482,11 +482,11 @@ def adversarial_code_llm(
                     baseline_output = str(baseline_response)
                 final_artifact = baseline_output
 
-                # Baseline test judge
+                # Deterministic execution remains the ground-truth benchmark signal.
                 test_result = await execute_mbpp_tests(baseline_output, mbpp_test_cases)
                 test_decision = test_judge(test_result)
 
-                # Baseline LLM judge
+                # The LLM judge is the review target whose decision may diverge from tests.
                 if use_llm_judge:
                     baseline_llm_judge_start = time.perf_counter()
                     llm_call_counts["baseline_llm_judge"] += 1
@@ -603,7 +603,8 @@ def adversarial_code_llm(
                     """Create a fresh attempt, apply tactic, then evaluate judges."""
                     applied_tactic_name = normalize_tactic_name(tactic_name)
 
-                    # Always regenerate from original prompt so each iteration is a fresh attempt.
+                    # Each iteration starts from the original prompt so the selector
+                    # influences a fresh candidate instead of mutating hidden stale state.
                     state.messages = deepcopy(original_messages)
                     ctx["failure_stage"] = "generate_candidate"
                     iteration_gen_start = time.perf_counter()
@@ -635,6 +636,8 @@ def adversarial_code_llm(
                     )
                     artifact_under_review = attacked
 
+                    # Inspect-visible output must stay aligned with the exact artifact that
+                    # deterministic execution and the LLM judge both evaluate in this path.
                     if hasattr(state, "output") and state.output and hasattr(state.output, "completion"):
                         state.output.completion = artifact_under_review
 
@@ -984,6 +987,8 @@ def adversarial_code_llm(
                 )
                 if final_artifact is None:
                     final_artifact = baseline_output
+                # Keep Inspect's final visible completion aligned with the last artifact
+                # evaluated in the benchmark loop so logs reflect the recorded metadata.
                 if hasattr(state, "output") and state.output and hasattr(state.output, "completion"):
                     state.output.completion = final_artifact
                 state.metadata = build_run_metadata(

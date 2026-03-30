@@ -406,7 +406,7 @@ Compare before vs after for a small debug run:
 
 ---
 
-# [ ] TASK 8 — Regression-proof the benchmark with focused tests
+# [x] TASK 8 — Regression-proof the benchmark with focused tests
 
 ## Goal
 Prevent the same failure mode from coming back.
@@ -433,7 +433,7 @@ Show which previous failure each new test would catch.
 
 ---
 
-# [ ] TASK 9 — Final cleanup and documentation of the fixed benchmark path
+# [x] TASK 9 — Final cleanup and documentation of the fixed benchmark path
 
 ## Goal
 Leave the benchmark loop understandable and maintainable.
