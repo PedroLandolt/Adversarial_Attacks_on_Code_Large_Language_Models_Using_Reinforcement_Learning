@@ -511,7 +511,7 @@ Do not skip this format.
 
 ---
 
-# [ ] TASK 10 — Convert MBPP from “same artifact everywhere” debugging mode into true judge-attack benchmark mode
+# [x] TASK 10 — Convert MBPP from “same artifact everywhere” debugging mode into true judge-attack benchmark mode
 
 ## Goal
 Keep the deterministic test path as ground truth while moving the benchmark to the final thesis architecture for judge attacks.

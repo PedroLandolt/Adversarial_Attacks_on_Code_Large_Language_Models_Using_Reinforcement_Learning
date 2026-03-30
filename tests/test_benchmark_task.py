@@ -161,17 +161,27 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
 
         async def generate_fn(_state):
             return FakeGenerateResponse(
+                "Here's a Python function that solves the task:\n\n"
+                "```python\n"
                 "def remove_Occ(s, ch):\n"
                 "    return s.replace(ch, '', 1)[::-1].replace(ch, '', 1)[::-1]\n"
+                "```\n"
+                "\nThis should work for the sample tests.\n"
             )
 
         with patch.object(benchmark_module, "sandbox", return_value=sandbox):
             solved_state = await solve(state, generate_fn)
 
         baseline = solved_state.metadata["baseline"]
+        self.assertIn("Here's a Python function", baseline["raw_completion"])
+        self.assertTrue(baseline["executable_code"].startswith("def remove_Occ"))
+        self.assertEqual(baseline["review_artifact"], baseline["executable_code"])
+        self.assertNotEqual(baseline["raw_completion"], baseline["executable_code"])
         self.assertTrue(baseline["test_result"]["pass"])
         self.assertEqual(baseline["test_judge"]["decision"], "PASS")
         self.assertEqual(len(sandbox.programs), 1)
+        self.assertTrue(sandbox.programs[0].startswith(baseline["executable_code"]))
+        self.assertNotIn("Here's a Python function", sandbox.programs[0])
         self.assertIn('assert remove_Occ("hello","l") == "heo"', sandbox.programs[0])
 
     async def test_react_attempt_keeps_artifact_aligned_across_record_judge_and_execution(self):
@@ -186,8 +196,8 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
             test_list=["assert add_one(1) == 3"],
         )
         generated = [
-            "def add_one(x):\n    return x + 1\n",
-            "def add_one(x):\n    return x + 1\n",
+            "Here is the baseline answer:\n```python\ndef add_one(x):\n    return x + 1\n```\n",
+            "Here is the attacked candidate:\n```python\ndef add_one(x):\n    return x + 1\n```\n",
         ]
 
         async def generate_fn(_state):
@@ -213,14 +223,20 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
             solved_state = await solve(state, generate_fn)
 
         attempt = solved_state.metadata["all_attempts"][0]
+        self.assertIn("raw_completion", attempt)
+        self.assertIn("executable_code", attempt)
+        self.assertIn("review_artifact", attempt)
         self.assertIn("artifact_under_review", attempt)
         self.assertIn("trace", attempt)
         self.assertIn("test_result", attempt)
         self.assertIn("test_judge", attempt)
         self.assertIn("llm_judge", attempt)
+        self.assertEqual(attempt["review_artifact"], attempt["artifact_under_review"])
         self.assertEqual(attempt["artifact_under_review"], attempt["trace"]["attacked_code_after_tactic"])
         self.assertEqual(attempt["artifact_under_review"], seen_codes[1]["code"])
-        self.assertTrue(sandbox.programs[1].startswith(attempt["artifact_under_review"]))
+        self.assertTrue(attempt["executable_code"].startswith("def add_one"))
+        self.assertTrue(sandbox.programs[1].startswith(attempt["executable_code"]))
+        self.assertNotEqual(attempt["review_artifact"], attempt["executable_code"])
 
     async def test_react_stops_early_and_keeps_required_metadata_fields(self):
         sandbox = FakeSandbox()

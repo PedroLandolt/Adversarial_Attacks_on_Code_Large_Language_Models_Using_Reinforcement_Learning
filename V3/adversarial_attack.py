@@ -61,6 +61,7 @@ import os
 import random
 import re
 import time
+import ast
 from copy import deepcopy
 
 
@@ -141,7 +142,10 @@ def adversarial_code_llm(
 
             # Extract problem
             problem_text = str(state.messages[0].content) if state.messages else state.input_text
-            python_code_block_pattern = re.compile(r"```python\\n(.*?)```", re.DOTALL)
+            python_code_block_pattern = re.compile(r"```(?:python)?\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
+            python_start_pattern = re.compile(
+                r"^\s*(def |class |from |import |async def |@|if __name__ == [\"']__main__[\"']:)"
+            )
 
             def extract_mbpp_tests(task_state: TaskState) -> list[str]:
                 metadata = getattr(task_state, "metadata", {}) or {}
@@ -155,11 +159,54 @@ def adversarial_code_llm(
 
                 return []
 
-            def extract_python_code(completion: str) -> str:
-                matches = python_code_block_pattern.findall(str(completion))
-                return matches[0] if matches else str(completion)
+            def _try_parse_python(candidate: str) -> str | None:
+                """Return candidate if it parses as Python, else None."""
+                text = str(candidate).strip()
+                if not text:
+                    return None
+                try:
+                    ast.parse(text)
+                    return text
+                except SyntaxError:
+                    return None
 
-            async def execute_mbpp_tests(candidate_code: str, test_cases: list[str]) -> dict:
+            def _trim_to_parsable_prefix(candidate: str) -> str | None:
+                """Trim trailing prose until the prefix parses as Python."""
+                lines = str(candidate).splitlines()
+                for end in range(len(lines), 0, -1):
+                    snippet = "\n".join(lines[:end]).strip()
+                    parsed = _try_parse_python(snippet)
+                    if parsed is not None:
+                        return parsed
+                return None
+
+            def extract_python_code(completion: str) -> str:
+                raw_text = str(completion).strip()
+                if not raw_text:
+                    return raw_text
+
+                direct_parse = _try_parse_python(raw_text)
+                if direct_parse is not None:
+                    return direct_parse
+
+                fenced_matches = python_code_block_pattern.findall(raw_text)
+                for match in fenced_matches:
+                    parsed_block = _trim_to_parsable_prefix(match)
+                    if parsed_block is not None:
+                        return parsed_block
+
+                lines = raw_text.splitlines()
+                for start_index, line in enumerate(lines):
+                    if python_start_pattern.match(line):
+                        parsed_suffix = _trim_to_parsable_prefix(
+                            "\n".join(lines[start_index:])
+                        )
+                        if parsed_suffix is not None:
+                            return parsed_suffix
+
+                return raw_text
+
+            async def execute_mbpp_tests(executable_code: str, test_cases: list[str]) -> dict:
                 if not test_cases:
                     return {
                         "pass": False,
@@ -167,8 +214,7 @@ def adversarial_code_llm(
                         "stderr": "No MBPP tests found in sample state.",
                     }
 
-                code_to_run = extract_python_code(candidate_code)
-                verification_program_parts = [code_to_run]
+                verification_program_parts = [str(executable_code)]
                 for test_case in test_cases:
                     verification_program_parts.append(
                         f"{test_case}, {repr(test_case[len('assert ') :])}"
@@ -202,6 +248,57 @@ def adversarial_code_llm(
                     "pass": bool(result.get("pass", False)),
                     "stdout": str(result.get("stdout", "")),
                     "stderr": str(result.get("stderr", "")),
+                }
+
+            def build_artifact_bundle(
+                raw_completion: str | None,
+                *,
+                tactic_name: str | None = None,
+                iteration: int | None = None,
+                test_decision_obj=None,
+                llm_decision_obj=None,
+            ) -> dict:
+                """Build explicit benchmark artifacts for execution vs review."""
+                raw_text = str(raw_completion) if raw_completion is not None else None
+                executable_code = (
+                    extract_python_code(raw_text) if raw_text is not None else None
+                )
+                review_artifact = executable_code
+                construction_metadata = {
+                    "raw_completion_present": raw_text is not None,
+                    "normalized_from_raw_completion": raw_text != executable_code,
+                    "review_renderer": "identity",
+                    "tactic": tactic_name,
+                }
+
+                if executable_code is not None and tactic_name is not None:
+                    review_artifact = apply_tactic(
+                        executable_code,
+                        tactic_name,
+                        problem_text,
+                        metadata={
+                            "iteration": iteration,
+                            "test_decision": (
+                                test_decision_obj.decision if test_decision_obj else None
+                            ),
+                            "llm_decision": (
+                                llm_decision_obj.decision if llm_decision_obj else None
+                            ),
+                            "llm_confidence": (
+                                llm_decision_obj.confidence if llm_decision_obj else None
+                            ),
+                            "llm_reasoning": (
+                                llm_decision_obj.reasoning if llm_decision_obj else None
+                            ),
+                        },
+                    )
+                    construction_metadata["review_renderer"] = "apply_tactic"
+
+                return {
+                    "raw_completion": raw_text,
+                    "executable_code": executable_code,
+                    "review_artifact": review_artifact,
+                    "construction_metadata": construction_metadata,
                 }
 
             def summarize_text(text: str | None, limit: int = 160) -> str | None:
@@ -403,7 +500,7 @@ def adversarial_code_llm(
 
             def build_baseline_record(
                 *,
-                artifact: str | None,
+                artifact_bundle: dict | None,
                 test_result: dict | None,
                 test_decision_obj=None,
                 llm_decision_obj=None,
@@ -411,12 +508,17 @@ def adversarial_code_llm(
                 error: str | None = None,
             ) -> dict:
                 """Build stable baseline metadata for run-level inspection."""
+                artifact_bundle = artifact_bundle or {}
                 record = {
                     "iteration": 0,
                     "mutation": "baseline",
-                    "artifact_under_review": artifact,
-                    "response": artifact,
-                    "attack_message": artifact,
+                    "raw_completion": artifact_bundle.get("raw_completion"),
+                    "executable_code": artifact_bundle.get("executable_code"),
+                    "review_artifact": artifact_bundle.get("review_artifact"),
+                    "artifact_under_review": artifact_bundle.get("review_artifact"),
+                    "response": artifact_bundle.get("raw_completion"),
+                    "attack_message": artifact_bundle.get("review_artifact"),
+                    "construction_metadata": artifact_bundle.get("construction_metadata"),
                     "test_result": clone_test_result(test_result),
                     "test_judge": serialize_test_judge(test_decision_obj),
                     "llm_judge": serialize_llm_judge(llm_decision_obj),
@@ -432,12 +534,13 @@ def adversarial_code_llm(
                 strategy_name: str,
                 baseline_record: dict,
                 all_attempts: list[dict],
-                final_artifact_value: str | None,
+                final_artifact_bundle: dict | None,
                 attack_succeeded_value: bool,
                 successful_iteration_value: int | None,
                 stop_reason_value: str,
             ) -> dict:
                 """Build stable run-level metadata for Inspect-visible output."""
+                final_artifact_bundle = final_artifact_bundle or {}
                 return {
                     "strategy": strategy_name,
                     "smoke_test": smoke_test,
@@ -445,7 +548,10 @@ def adversarial_code_llm(
                     "baseline": baseline_record,
                     "all_attempts": all_attempts,
                     "attempt_history_compact": build_attempt_history_compact(all_attempts),
-                    "final_artifact": final_artifact_value,
+                    "raw_completion": final_artifact_bundle.get("raw_completion"),
+                    "executable_code": final_artifact_bundle.get("executable_code"),
+                    "review_artifact": final_artifact_bundle.get("review_artifact"),
+                    "final_artifact": final_artifact_bundle.get("review_artifact"),
                     "attack_succeeded": attack_succeeded_value,
                     "successful_iteration": successful_iteration_value,
                     "total_iterations": len(all_attempts),
@@ -459,8 +565,8 @@ def adversarial_code_llm(
                 }
 
             # === BASELINE ===
-            baseline_output = None
-            final_artifact = None
+            baseline_artifact_bundle = None
+            final_artifact_bundle = None
             test_decision = None
             llm_decision = None
             test_result = None
@@ -480,10 +586,14 @@ def adversarial_code_llm(
                         baseline_output = str(baseline_response.output)
                 else:
                     baseline_output = str(baseline_response)
-                final_artifact = baseline_output
+                baseline_artifact_bundle = build_artifact_bundle(baseline_output)
+                final_artifact_bundle = baseline_artifact_bundle
 
                 # Deterministic execution remains the ground-truth benchmark signal.
-                test_result = await execute_mbpp_tests(baseline_output, mbpp_test_cases)
+                test_result = await execute_mbpp_tests(
+                    baseline_artifact_bundle["executable_code"],
+                    mbpp_test_cases,
+                )
                 test_decision = test_judge(test_result)
 
                 # The LLM judge is the review target whose decision may diverge from tests.
@@ -493,7 +603,7 @@ def adversarial_code_llm(
                     llm_call_counts["total"] += 1
                     llm_decision = await llm_judge_instance.evaluate(
                         problem_text,
-                        baseline_output,
+                        baseline_artifact_bundle["review_artifact"],
                         test_result,
                     )
                     timings["baseline_llm_judge_seconds"] += time.perf_counter() - baseline_llm_judge_start
@@ -501,7 +611,7 @@ def adversarial_code_llm(
             except Exception as e:
                 error_text = str(e).strip() or f"{type(e).__name__} with empty message"
                 baseline_record = build_baseline_record(
-                    artifact=None,
+                    artifact_bundle=None,
                     test_result=None,
                     test_decision_obj=None,
                     llm_decision_obj=None,
@@ -513,7 +623,7 @@ def adversarial_code_llm(
                     strategy_name=mutation_strategy,
                     baseline_record=baseline_record,
                     all_attempts=attempts,
-                    final_artifact_value=None,
+                    final_artifact_bundle=None,
                     attack_succeeded_value=False,
                     successful_iteration_value=None,
                     stop_reason_value="baseline_error",
@@ -523,7 +633,7 @@ def adversarial_code_llm(
             # If baseline succeeded, record it
             if test_decision is not None:
                 baseline_record = build_baseline_record(
-                    artifact=baseline_output,
+                    artifact_bundle=baseline_artifact_bundle,
                     test_result=test_result,
                     test_decision_obj=test_decision,
                     llm_decision_obj=llm_decision,
@@ -534,7 +644,7 @@ def adversarial_code_llm(
                 
                 previous_tactics = []
                 previous_attempts_history = []
-                current_code = baseline_output
+                current_code = baseline_artifact_bundle["review_artifact"]
                 attack_succeeded = False
                 stop_reason = None
                 valid_tactics = {"injection", "output", "semantic", "cot"}
@@ -615,26 +725,22 @@ def adversarial_code_llm(
 
                     if hasattr(generated_state, "output") and generated_state.output:
                         if hasattr(generated_state.output, "completion"):
-                            generated_code = generated_state.output.completion
+                            raw_completion = generated_state.output.completion
                         else:
-                            generated_code = str(generated_state.output)
+                            raw_completion = str(generated_state.output)
                     else:
-                        generated_code = "[No output generated]"
+                        raw_completion = "[No output generated]"
 
+                    ctx["generated_code_before_tactic"] = extract_python_code(raw_completion)
                     ctx["failure_stage"] = "apply_tactic"
-                    attacked = apply_tactic(
-                        generated_code,
-                        applied_tactic_name,
-                        problem_text,
-                        metadata={
-                            "iteration": iteration,
-                            "test_decision": last_test_result.decision,
-                            "llm_decision": last_llm_result.decision,
-                            "llm_confidence": last_llm_result.confidence,
-                            "llm_reasoning": last_llm_result.reasoning,
-                        },
+                    artifact_bundle = build_artifact_bundle(
+                        raw_completion,
+                        tactic_name=applied_tactic_name,
+                        iteration=iteration,
+                        test_decision_obj=last_test_result,
+                        llm_decision_obj=last_llm_result,
                     )
-                    artifact_under_review = attacked
+                    artifact_under_review = artifact_bundle["review_artifact"]
 
                     # Inspect-visible output must stay aligned with the exact artifact that
                     # deterministic execution and the LLM judge both evaluate in this path.
@@ -642,7 +748,10 @@ def adversarial_code_llm(
                         state.output.completion = artifact_under_review
 
                     ctx["failure_stage"] = "test_execution"
-                    test_result_iter = await execute_mbpp_tests(artifact_under_review, mbpp_test_cases)
+                    test_result_iter = await execute_mbpp_tests(
+                        artifact_bundle["executable_code"],
+                        mbpp_test_cases,
+                    )
                     next_test_decision = test_judge(test_result_iter)
                     ctx["failure_stage"] = "llm_judge"
                     iteration_llm_judge_start = time.perf_counter()
@@ -650,7 +759,7 @@ def adversarial_code_llm(
                     llm_call_counts["total"] += 1
                     next_llm_decision = await llm_judge_instance.evaluate(
                         problem_text,
-                        artifact_under_review,
+                        artifact_bundle["review_artifact"],
                         test_result_iter,
                     )
                     timings["iteration_llm_judge_seconds"].append(time.perf_counter() - iteration_llm_judge_start)
@@ -659,8 +768,7 @@ def adversarial_code_llm(
                         and next_llm_decision.decision == "PASS"
                     )
                     return (
-                        generated_code,
-                        artifact_under_review,
+                        artifact_bundle,
                         next_test_decision,
                         next_llm_decision,
                         test_result_iter,
@@ -674,7 +782,7 @@ def adversarial_code_llm(
                     selected_tactic_name: str | None,
                     applied_tactic_name: str | None,
                     previous_tactics_before: list[str],
-                    attacked_code: str | None,
+                    artifact_bundle: dict | None,
                     attack_success: bool,
                     failure_stage: str | None = None,
                     trace: dict | None = None,
@@ -685,16 +793,21 @@ def adversarial_code_llm(
                     stop_reason: str | None = None,
                 ) -> dict:
                     """Build per-iteration metadata record for ReAct strategy."""
+                    artifact_bundle = artifact_bundle or {}
                     record = {
                         "iteration": iteration,
                         "mutation": "react_tactic",
                         "tactic": applied_tactic_name,
                         "selected_tactic": selected_tactic_name,
                         "applied_tactic": applied_tactic_name,
-                        "artifact_under_review": attacked_code,
+                        "raw_completion": artifact_bundle.get("raw_completion"),
+                        "executable_code": artifact_bundle.get("executable_code"),
+                        "review_artifact": artifact_bundle.get("review_artifact"),
+                        "artifact_under_review": artifact_bundle.get("review_artifact"),
                         "prompt": problem_text,
-                        "response": attacked_code,
-                        "attack_message": attacked_code,
+                        "response": artifact_bundle.get("raw_completion"),
+                        "attack_message": artifact_bundle.get("review_artifact"),
+                        "construction_metadata": artifact_bundle.get("construction_metadata"),
                         "test_result": clone_test_result(test_result_obj),
                         "previous_tactics": previous_tactics_before,
                         "attack_success": attack_success,
@@ -721,6 +834,7 @@ def adversarial_code_llm(
                         "applied_tactic_name": None,
                         "selector_input": None,
                         "selector_output": None,
+                        "artifact_bundle": None,
                         "generated_code_before_tactic": None,
                         "attacked_code": None,
                         "previous_tactics_before": previous_tactics.copy(),
@@ -751,6 +865,7 @@ def adversarial_code_llm(
                         "artifact_under_review": ctx["attacked_code"],
                         "generated_code_before_tactic": ctx["generated_code_before_tactic"],
                         "attacked_code_after_tactic": ctx["attacked_code"],
+                        "artifact_bundle": ctx["artifact_bundle"],
                     }
 
                 def enrich_iteration_trace(
@@ -817,7 +932,7 @@ def adversarial_code_llm(
                             selected_tactic_name=ctx["selected_tactic_name"],
                             applied_tactic_name=ctx["applied_tactic_name"],
                             previous_tactics_before=ctx["previous_tactics_before"],
-                            attacked_code=ctx["attacked_code"],
+                            artifact_bundle=ctx["artifact_bundle"],
                             attack_success=attack_success,
                             failure_stage=failure_stage,
                             trace=enrich_iteration_trace(
@@ -890,8 +1005,7 @@ def adversarial_code_llm(
 
                         # === OBSERVATION: Apply tactic ===
                         (
-                            ctx["generated_code_before_tactic"],
-                            ctx["attacked_code"],
+                            ctx["artifact_bundle"],
                             test_decision,
                             llm_decision,
                             test_result_iter,
@@ -902,6 +1016,7 @@ def adversarial_code_llm(
                             iteration,
                             ctx,
                         )
+                        ctx["attacked_code"] = ctx["artifact_bundle"]["review_artifact"]
                         ctx["failure_stage"] = None
 
                         record_iteration_success(
@@ -912,7 +1027,7 @@ def adversarial_code_llm(
                             test_result_obj=test_result_iter,
                             attack_success=attack_succeeded,
                         )
-                        final_artifact = ctx["attacked_code"]
+                        final_artifact_bundle = ctx["artifact_bundle"]
 
                         # Record tactic only after successful application/evaluation.
                         update_iteration_state(
@@ -943,7 +1058,7 @@ def adversarial_code_llm(
                                 selected_tactic_name=ctx["selected_tactic_name"],
                                 applied_tactic_name=ctx["applied_tactic_name"],
                                 previous_tactics_before=ctx["previous_tactics_before"],
-                                attacked_code=ctx["attacked_code"],
+                                artifact_bundle=ctx["artifact_bundle"],
                                 attack_success=False,
                                 failure_stage=derive_failure_stage(
                                     raw_stage=ctx["failure_stage"],
@@ -985,17 +1100,17 @@ def adversarial_code_llm(
                     ),
                     None,
                 )
-                if final_artifact is None:
-                    final_artifact = baseline_output
+                if final_artifact_bundle is None:
+                    final_artifact_bundle = baseline_artifact_bundle
                 # Keep Inspect's final visible completion aligned with the last artifact
                 # evaluated in the benchmark loop so logs reflect the recorded metadata.
                 if hasattr(state, "output") and state.output and hasattr(state.output, "completion"):
-                    state.output.completion = final_artifact
+                    state.output.completion = final_artifact_bundle["review_artifact"]
                 state.metadata = build_run_metadata(
                     strategy_name="react",
                     baseline_record=baseline_record,
                     all_attempts=attempts,
-                    final_artifact_value=final_artifact,
+                    final_artifact_bundle=final_artifact_bundle,
                     attack_succeeded_value=attack_succeeded,
                     successful_iteration_value=successful_iteration,
                     stop_reason_value=stop_reason,
@@ -1033,25 +1148,29 @@ def adversarial_code_llm(
                     failure_stage = "generate_candidate"
                     if hasattr(mutated_state, 'output') and mutated_state.output:
                         if hasattr(mutated_state.output, 'completion'):
-                            mutated_output = mutated_state.output.completion
+                            raw_completion = mutated_state.output.completion
                         else:
-                            mutated_output = str(mutated_state.output)
+                            raw_completion = str(mutated_state.output)
                     else:
-                        mutated_output = "[No output generated]"
+                        raw_completion = "[No output generated]"
 
-                    # Apply red-teaming tactic if specified
                     failure_stage = "apply_optional_red_teaming_tactic"
-                    if red_teaming_tactic:
-                        mutated_output = apply_tactic(
-                            mutated_output,
-                            red_teaming_tactic,
-                            problem_text,
-                        )
-                    final_artifact = mutated_output
+                    artifact_bundle = build_artifact_bundle(
+                        raw_completion,
+                        tactic_name=red_teaming_tactic,
+                        iteration=iteration,
+                        test_decision_obj=test_decision,
+                        llm_decision_obj=llm_decision,
+                    )
+                    mutated_output = artifact_bundle["review_artifact"]
+                    final_artifact_bundle = artifact_bundle
 
                     # Test judge
                     failure_stage = "test_execution"
-                    test_result = await execute_mbpp_tests(mutated_output, mbpp_test_cases)
+                    test_result = await execute_mbpp_tests(
+                        artifact_bundle["executable_code"],
+                        mbpp_test_cases,
+                    )
                     test_decision = test_judge(test_result)
 
                     # LLM judge
@@ -1060,7 +1179,7 @@ def adversarial_code_llm(
                     if use_llm_judge:
                         llm_decision = await llm_judge_instance.evaluate(
                             problem_text,
-                            mutated_output,
+                            artifact_bundle["review_artifact"],
                             test_result,
                         )
 
@@ -1090,10 +1209,14 @@ def adversarial_code_llm(
                         "mutation": mutation_name,
                         "tactic": red_teaming_tactic,
                         "failure_stage": failure_stage,
+                        "raw_completion": artifact_bundle["raw_completion"],
+                        "executable_code": artifact_bundle["executable_code"],
+                        "review_artifact": artifact_bundle["review_artifact"],
                         "artifact_under_review": mutated_output,
                         "prompt": problem_text,
-                        "response": mutated_output,
-                        "attack_message": mutated_output,
+                        "response": artifact_bundle["raw_completion"],
+                        "attack_message": artifact_bundle["review_artifact"],
+                        "construction_metadata": artifact_bundle["construction_metadata"],
                         "test_result": clone_test_result(test_result),
                         "stop_reason": "attack_succeeded" if attack_success_iter else None,
                         "test_judge": serialize_test_judge(test_decision),
@@ -1180,15 +1303,15 @@ def adversarial_code_llm(
                 None,
             )
             attack_succeeded = successful_iteration is not None
-            if final_artifact is None:
-                final_artifact = baseline_output
+            if final_artifact_bundle is None:
+                final_artifact_bundle = baseline_artifact_bundle
             if hasattr(state, "output") and state.output and hasattr(state.output, "completion"):
-                state.output.completion = final_artifact
+                state.output.completion = final_artifact_bundle["review_artifact"]
             state.metadata = build_run_metadata(
                 strategy_name=mutation_strategy,
                 baseline_record=baseline_record,
                 all_attempts=attempts,
-                final_artifact_value=final_artifact,
+                final_artifact_bundle=final_artifact_bundle,
                 attack_succeeded_value=attack_succeeded,
                 successful_iteration_value=successful_iteration,
                 stop_reason_value="attack_succeeded" if attack_succeeded else "max_iterations_reached",
