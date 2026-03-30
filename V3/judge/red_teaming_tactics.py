@@ -11,6 +11,8 @@ Four distinct tactics to manipulate judge decisions:
 import re
 import hashlib
 
+from agent.tactic_registry import get_supported_tactic_families, get_tactic_entry
+
 
 def _extract_function_code(code: str) -> str:
     """Extract primary function definition when available."""
@@ -180,16 +182,22 @@ def apply_tactic(
         Code with red-teaming tactic applied
     """
     
-    if tactic == "injection":
+    try:
+        tactic_entry = get_tactic_entry(tactic, environment="benchmark")
+    except ValueError:
+        return code
+    renderer_binding = tactic_entry.renderer_binding
+
+    if renderer_binding == "prompt_injection":
         return tactic_1_prompt_injection(code, metadata=metadata)
     
-    elif tactic == "output":
+    elif renderer_binding == "output_manipulation":
         return tactic_2_output_manipulation(code, metadata=metadata)
     
-    elif tactic == "semantic":
+    elif renderer_binding == "semantic_inconsistency":
         return tactic_3_semantic_inconsistency_evasion(code, metadata=metadata)
     
-    elif tactic == "cot":
+    elif renderer_binding == "cot_poisoning":
         return tactic_4_cot_poisoning(code, problem, expected_output, metadata=metadata)
     
     else:
@@ -198,4 +206,4 @@ def apply_tactic(
 
 def get_all_tactics() -> list[str]:
     """Return list of available tactics."""
-    return ["injection", "output", "semantic", "cot"]
+    return get_supported_tactic_families("benchmark")

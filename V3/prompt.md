@@ -572,7 +572,7 @@ Show one MBPP sample and one HumanEval sample being loaded through the same inte
 
 ---
 
-# [ ] TASK 12 — Replace the closed 4-tactic selector interface with a taxonomy-backed action registry
+# [x] TASK 12 — Replace the closed 4-tactic selector interface with a taxonomy-backed action registry
 
 ## Goal
 Stop treating tactic choice as a tiny hardcoded enum so the selector can later generalize across benchmark and Gitea.

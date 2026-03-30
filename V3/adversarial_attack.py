@@ -55,6 +55,7 @@ from judge.llm_judge import LLMJudge
 from judge.test_judge import test_judge
 from judge.red_teaming_tactics import apply_tactic
 from agent.selector_policy import ReactSelectorPolicy, SelectorContext
+from agent.tactic_registry import get_tactic_entry
 from utils.benchmark_loader import (
     build_verification_program,
     extract_benchmark_spec,
@@ -644,14 +645,12 @@ def adversarial_code_llm(
                 current_code = baseline_artifact_bundle["review_artifact"]
                 attack_succeeded = False
                 stop_reason = None
-                valid_tactics = {"injection", "output", "semantic", "cot"}
-
                 def normalize_tactic_name(tactic_name: str) -> str:
-                    """Normalize and validate tactic names against closed family set."""
-                    normalized = str(tactic_name).strip().lower()
-                    if normalized not in valid_tactics:
-                        raise ValueError(f"Invalid tactic selected/applied: {tactic_name}")
-                    return normalized
+                    """Normalize and validate tactic names against registry-backed action space."""
+                    return get_tactic_entry(
+                        tactic_name,
+                        environment="benchmark",
+                    ).tactic_family
 
                 def build_selector_payload(
                     iteration: int,

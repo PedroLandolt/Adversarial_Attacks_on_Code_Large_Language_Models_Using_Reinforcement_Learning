@@ -11,6 +11,7 @@ from typing import Protocol
 from typing import Any
 
 from agent.react_selector import ReactTacticSelector
+from agent.tactic_registry import TacticRegistryEntry
 
 
 @dataclass(frozen=True)
@@ -32,7 +33,10 @@ class SelectorContext:
 class SelectorDecision:
     """Structured selector output for tactic-family choice."""
 
+    tactic_id: str
     tactic_family: str
+    environment_support: tuple[str, ...]
+    renderer_binding: str
     selector_name: str
     reasoning: str | None = None
 
@@ -47,11 +51,11 @@ class SelectorPolicy(Protocol):
 class ReactSelectorPolicy:
     """Adapter that exposes ReactTacticSelector via SelectorPolicy interface."""
 
-    def __init__(self, selector_model: str | Any):
-        self._selector = ReactTacticSelector(selector_model)
+    def __init__(self, selector_model: str | Any, environment: str = "benchmark"):
+        self._selector = ReactTacticSelector(selector_model, environment=environment)
 
     async def select(self, context: SelectorContext) -> SelectorDecision:
-        chosen = await self._selector.select_tactic(
+        chosen: TacticRegistryEntry = await self._selector.select_tactic(
             problem=context.problem,
             current_code=context.current_code,
             test_judge_decision=context.test_judge_decision,
@@ -63,7 +67,10 @@ class ReactSelectorPolicy:
             tool_decompose_output=context.tool_decompose_output,
         )
         return SelectorDecision(
-            tactic_family=chosen.value,
+            tactic_id=chosen.tactic_id,
+            tactic_family=chosen.tactic_family,
+            environment_support=chosen.environment_support,
+            renderer_binding=chosen.renderer_binding,
             selector_name="react",
             reasoning=None,
         )
