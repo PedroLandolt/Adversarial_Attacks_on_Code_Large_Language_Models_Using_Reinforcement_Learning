@@ -623,7 +623,139 @@ Show at least one run where a non-legacy taxonomy action is selected and rendere
 
 ---
 
-# [ ] TASK 14 — Integrate Gitea through the protected environment contract without rewriting the base
+# [ ] TASK 14 — Add explicit policy baselines before RL
+
+## Goal
+Make policy comparison thesis-ready before introducing RL by defining the baseline decision modes that will be compared across environments.
+
+## Required changes
+- Introduce a clear policy-mode abstraction for action selection.
+- Support at least these policy modes:
+  - `random_choice`
+  - `agent_based_decision` (current selector behavior)
+  - `rl_bandit` (future implementation placeholder if not yet active)
+- Ensure the benchmark path can run under the same selector contract regardless of policy mode.
+- Keep the current agent-based selector as the default operational path.
+- Do not implement full RL in this task.
+
+## Delivery
+A minimal but explicit policy-mode layer that makes future comparison possible without rewriting the environments.
+
+## Validate
+Show that the benchmark can be configured to run at least:
+- `random_choice`
+- `agent_based_decision`
+
+through the same selector-facing interface.
+
+## Do not
+- do not hardcode comparison logic outside the selector / policy boundary,
+- do not implement SARSA or Q-Learning yet,
+- do not change benchmark success semantics.
+
+---
+
+# [ ] TASK 15 — Define a shared state/action/reward contract for benchmark and Gitea
+
+## Goal
+Model the problem so the same RL-capable selector layer can later operate over both benchmark and Gitea without forcing the environments to become identical.
+
+## Required changes
+- Define a shared high-level selector state contract that can represent both:
+  - benchmark trajectories,
+  - Gitea trajectories.
+- The state contract must support at least:
+  - environment name,
+  - iteration index,
+  - previous actions,
+  - previous outcomes,
+  - latest deterministic / ground-truth signal,
+  - latest review / approval signal,
+  - blocker / invalid-attempt signal,
+  - terminal success / failure signal.
+- Define an action record shape that points to:
+  - taxonomy action,
+  - tactic family,
+  - renderer binding,
+  - environment support.
+- Define a reward contract in plain terms for later RL use, including:
+  - success reward,
+  - blocker penalty,
+  - invalid-artifact penalty,
+  - optional iteration-cost penalty.
+
+## Delivery
+A selector-facing data contract that is environment-agnostic in shape while still allowing environment-specific content.
+
+## Validate
+Show one benchmark state example and one Gitea state example with the same top-level structure.
+
+## Do not
+- do not implement RL updates yet,
+- do not pretend benchmark and Gitea use identical fields internally,
+- do not bury reward logic inside renderers or environment plumbing.
+
+---
+
+# [ ] TASK 16 — Implement random-choice baseline through the shared selector contract
+
+## Goal
+Create a simple non-agent, non-RL baseline that chooses actions randomly from the registry-backed action space.
+
+## Required changes
+- Implement a `random_choice` policy mode using the same selector contract as the current agent-based selector.
+- Ensure random choice only selects actions supported by the active environment.
+- Record the chosen action in the same structured format already used by the benchmark.
+- Keep deterministic execution and review rendering unchanged.
+
+## Delivery
+A working random-choice baseline that can be compared fairly against the current selector.
+
+## Validate
+Show one benchmark debug run where:
+- the random policy is active,
+- the selected action is recorded through the registry contract,
+- the rest of the benchmark loop behaves normally.
+
+## Do not
+- do not special-case random choice outside the selector boundary,
+- do not change registry semantics,
+- do not change benchmark success criteria.
+
+---
+
+# [ ] TASK 17 — Introduce a first Bandit-based selector as the initial RL baseline
+
+## Goal
+Start RL with the simplest useful action-selection method: a bandit-style policy over the registry-backed action space.
+
+## Required changes
+- Implement a first bandit-based selector policy over the existing action registry.
+- The bandit policy must operate through the same selector interface as:
+  - random choice,
+  - agent-based decision.
+- Use the shared reward contract from the previous task.
+- Keep the first implementation intentionally simple and controlled.
+- Support benchmark mode first; do not expand to full Gitea learning logic yet unless the same contract already makes it trivial.
+
+## Delivery
+A first RL-capable selector policy that learns action preference over time without rewriting environment logic.
+
+## Validate
+Show one controlled benchmark experiment where:
+- `random_choice`,
+- `agent_based_decision`,
+- `rl_bandit`
+can all select actions through the same registry contract.
+
+## Do not
+- do not jump straight to SARSA or Q-Learning in this task,
+- do not bury bandit state inside benchmark metadata in an ad hoc way,
+- do not rewrite the environments to fit the bandit.
+
+---
+
+# [ ] TASK 18 — Integrate Gitea through the protected environment contract without rewriting the base
 
 ## Goal
 Use the professor-provided Gitea environment as a real second environment without breaking its contract.
@@ -637,6 +769,7 @@ Use the professor-provided Gitea environment as a real second environment withou
   - what constitutes a meaningful attempt,
   - what counts as success or approval despite failing ground truth.
 - Keep Gitea-specific workflow logic out of the benchmark harness.
+- Ensure the shared selector contract can represent Gitea state without forking the whole policy interface.
 
 ## Delivery
 A clean integration layer that uses the protected Gitea contract instead of rewriting it.
@@ -651,7 +784,7 @@ Show that the Gitea path uses the provided environment contract and that no prot
 
 ---
 
-# [ ] TASK 15 — Define Gitea-specific success, blocker, and attempt accounting
+# [ ] TASK 19 — Define Gitea-specific success, blocker, and attempt accounting
 
 ## Goal
 Make the Gitea environment experimentally trustworthy instead of treating “approval happened” as an underspecified event.
@@ -664,7 +797,7 @@ Make the Gitea environment experimentally trustworthy instead of treating “app
   - environment failure,
   - reviewer rejection,
   - reviewer approval despite failing ground truth.
-- Record Gitea-specific trajectory information in a structured way compatible with the common selector contract.
+- Record Gitea-specific trajectory information in a structured way compatible with the shared selector contract.
 - Keep the schema parallel in spirit to the benchmark environment without pretending both environments are identical.
 
 ## Delivery
@@ -679,60 +812,70 @@ Show one example trajectory with enough metadata to understand whether the Gitea
 
 ---
 
-# [ ] TASK 16 — Make the selector state and reward interface environment-agnostic
+# [ ] TASK 20 — Compare benchmark policies across MBPP and HumanEval before full cross-environment transfer
 
 ## Goal
-Prepare the current selector layer for later RL replacement without duplicating policy logic per environment.
+Measure how well the framework already works before claiming RL value or cross-environment generalization.
 
 ## Required changes
-- Define a common selector-state interface that works for both benchmark and Gitea.
-- The state must include environment-aware feedback while keeping a shared structure for:
-  - previous actions,
-  - previous outcomes,
-  - confidence / approval signals,
-  - blocker signals,
-  - terminal success or failure.
-- Define an environment-agnostic action record shape that points to a taxonomy action plus environment-specific renderer binding.
-- Keep the current selector operational while migrating to this contract.
+- Run the benchmark path under the explicit policy modes:
+  - `random_choice`
+  - `agent_based_decision`
+  - `rl_bandit` (once available)
+- Use the shared benchmark adapter contract across:
+  - MBPP
+  - HumanEval
+- Record comparable experiment outputs for all policy modes.
+- Preserve per-benchmark detail while enabling top-level comparison.
 
 ## Delivery
-A selector contract that can power the current logic now and RL later.
+A first benchmark comparison layer that shows how well or badly the framework performs before Gitea transfer claims.
 
 ## Validate
-Show one benchmark state example and one Gitea state example using the same high-level selector interface shape.
+Show comparable outputs for at least:
+- one MBPP run
+- one HumanEval run
+under the same policy-mode reporting scheme.
 
 ## Do not
-- do not implement RL yet inside this task,
-- do not duplicate large selector codepaths per environment.
+- do not mix benchmark and Gitea metrics into one misleading number,
+- do not claim transfer if only one benchmark has been evaluated.
 
 ---
 
-# [ ] TASK 17 — Introduce RL in the selector / policy layer on top of the stabilized contract
+# [ ] TASK 21 — Explore SARSA and Q-Learning on top of the stabilized selector contract
 
 ## Goal
-Add RL where it belongs: in the policy that chooses actions, not inside benchmark execution or Gitea tool plumbing.
+Move beyond the first bandit baseline only after the state/action/reward contract is stable enough to support sequential RL methods.
 
 ## Required changes
-- Keep deterministic environment execution separate from policy learning.
-- Implement an RL-capable selector or selector-policy module that can operate over the registry-backed action space.
-- Define reward and penalties using the stabilized environment contracts.
-- Compare RL against at least one non-RL selector baseline already present in the project.
-- Ensure the RL layer can run on benchmark mode first and then reuse the same policy contract for Gitea.
+- Reuse the shared selector interface and reward contract.
+- Implement controlled experimental selector-policy variants for:
+  - `rl_sarsa`
+  - `rl_q_learning`
+- Keep environment execution separate from learning updates.
+- Start with benchmark mode first unless the Gitea contract is already stable enough to reuse directly.
+- Keep policy comparison aligned with the earlier baselines.
 
 ## Delivery
-A first RL-capable policy layer integrated through the selector contract rather than by rewriting the environments.
+Experimental sequential RL policy variants that sit on top of the same action registry and selector boundary.
 
 ## Validate
-Show one controlled experiment where the RL-capable selector chooses actions through the same action registry used by the non-RL baseline.
+Show one controlled experiment where:
+- `random_choice`
+- `agent_based_decision`
+- `rl_bandit`
+- `rl_sarsa` or `rl_q_learning`
+all choose actions through the same policy interface.
 
 ## Do not
-- do not bury RL decisions inside attack renderers,
-- do not tightly couple RL code to MBPP-only assumptions,
+- do not hide RL updates inside renderers,
+- do not couple SARSA or Q-Learning to MBPP-only field assumptions,
 - do not skip baseline comparison.
 
 ---
 
-# [ ] TASK 18 — Consolidate final thesis-facing metrics and experiment outputs across the three mandatory tracks
+# [ ] TASK 22 — Consolidate final thesis-facing metrics and experiment outputs across benchmark, Gitea, and policy comparisons
 
 ## Goal
 Make the final project outputs defensible for thesis writing and comparison.
@@ -741,26 +884,32 @@ Make the final project outputs defensible for thesis writing and comparison.
 - Define a final experiment output contract that separates:
   - benchmark judge-attack results,
   - Gitea reviewer-approval results,
-  - selector / RL comparison results.
-- Preserve per-environment metrics while also providing shared top-level experiment summaries.
+  - policy comparison results.
+- Preserve per-environment metrics while also providing shared top-level summaries.
 - Ensure the final exported metadata makes it possible to discuss:
   - attack success,
   - blocker rate,
+  - invalid-attempt rate,
   - tactic diversity,
-  - selector behavior,
-  - transfer across environments.
+  - policy behavior,
+  - transfer across MBPP, HumanEval, and Gitea.
+- Keep outputs compatible with thesis analysis without flattening away environment differences.
 
 ## Delivery
-A final experiment reporting contract that supports thesis analysis without hiding environment differences.
+A final experiment reporting contract that supports thesis analysis across the three mandatory tracks.
 
 ## Validate
-Show how one benchmark run and one Gitea run would both appear under the consolidated reporting scheme.
+Show how:
+- one benchmark run,
+- one Gitea run,
+- and one policy-comparison result
+would appear under the consolidated reporting scheme.
 
 ## Do not
 - do not flatten all environments into one misleading metric,
-- do not remove the detailed per-attempt logs needed for analysis.
+- do not remove the detailed per-attempt logs needed for analysis,
+- do not claim RL benefit without showing the comparison context.
 
----
 
 ## Definition of done
 
