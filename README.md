@@ -372,10 +372,10 @@ V3/
 
 ```bash
 inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen2.5:7b \
+  --model ollama/qwen3.5:0.8b \
   -T mutation_strategy=react \
   -T use_llm_judge=True \
-  -T judge_model=ollama/qwen2.5:7b \
+  -T judge_model=ollama/qwen3.5:0.8b \
   -T max_iterations=5 \
   --limit 2
 ```
@@ -385,17 +385,49 @@ inspect eval V3/adversarial_attack.py@adversarial_code_llm \
 ```bash
 # Random heuristic mutations
 inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen2.5:7b \
+  --model ollama/qwen3.5:0.8b \
   -T mutation_strategy=random \
   -T max_iterations=3 \
   --limit 2
 
 # Sequential heuristic mutations
 inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen2.5:7b \
+  --model ollama/qwen3.5:0.8b \
   -T mutation_strategy=sequential \
   -T max_iterations=3 \
   --limit 2
+```
+
+### Conference Smoke Tests
+
+```bash
+# MBPP smoke test through launcher
+bash V3/run.sh mbpp --quick
+
+# HumanEval smoke test through launcher
+bash V3/run.sh humaneval --quick
+
+# MBPP smoke test
+inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen3.5:0.8b \
+  -T benchmark=mbpp \
+  -T mutation_strategy=react \
+  -T use_llm_judge=True \
+  -T judge_model=ollama/qwen3.5:0.8b \
+  -T selector_model=ollama/qwen3.5:0.8b \
+  -T max_iterations=1 \
+  --limit 1
+
+# HumanEval smoke test
+inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen3.5:0.8b \
+  -T benchmark=humaneval \
+  -T mutation_strategy=react \
+  -T use_llm_judge=True \
+  -T judge_model=ollama/qwen3.5:0.8b \
+  -T selector_model=ollama/qwen3.5:0.8b \
+  -T max_iterations=1 \
+  --limit 1
 ```
 
 ### Run Full Test Suite

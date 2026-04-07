@@ -4,8 +4,10 @@
 # Usage:
 #   bash V3/run.sh
 #   bash V3/run.sh mbpp
+#   bash V3/run.sh humaneval
 #   bash V3/run.sh gitea
 #   bash V3/run.sh mbpp --quick
+#   bash V3/run.sh humaneval --quick
 #   bash V3/run.sh gitea --quick
 
 set -euo pipefail
@@ -13,7 +15,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-TASK="mbpp"
+TASK="benchmark"
+BENCHMARK="mbpp"
 EXTRA_ARGS=()
 
 # ------------------------------------------------------------
@@ -42,7 +45,12 @@ fi
 # ------------------------------------------------------------
 if [[ $# -ge 1 ]]; then
     case "$1" in
-        mbpp|gitea)
+        mbpp|humaneval)
+            TASK="benchmark"
+            BENCHMARK="$1"
+            shift
+            ;;
+        gitea)
             TASK="$1"
             shift
             ;;
@@ -56,7 +64,7 @@ fi
 # ------------------------------------------------------------
 # Effective config preview
 # ------------------------------------------------------------
-EFFECTIVE_MODEL="${MODEL:-ollama/qwen3.5:9b}"
+EFFECTIVE_MODEL="${MODEL:-ollama/qwen3.5:0.8b}"
 EFFECTIVE_JUDGE_MODEL="${JUDGE_MODEL:-$EFFECTIVE_MODEL}"
 EFFECTIVE_SELECTOR_MODEL="${SELECTOR_MODEL:-$EFFECTIVE_JUDGE_MODEL}"
 EFFECTIVE_MAX_ITER="${MAX_ITER:-3}"
@@ -69,6 +77,9 @@ echo "============================================================"
 echo "Adversarial Attack Launcher"
 echo "============================================================"
 echo "Task preset:        $TASK"
+if [[ "$TASK" == "benchmark" ]]; then
+    echo "BENCHMARK:          $BENCHMARK"
+fi
 echo "MODEL:              $EFFECTIVE_MODEL"
 echo "JUDGE_MODEL:        $EFFECTIVE_JUDGE_MODEL"
 echo "SELECTOR_MODEL:     $EFFECTIVE_SELECTOR_MODEL"
@@ -84,8 +95,8 @@ if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
 fi
 echo "============================================================"
 
-action_mbpp() {
-    bash "$SCRIPT_DIR/scripts/run_adversarial_code_llm.sh" "${EXTRA_ARGS[@]}"
+action_benchmark() {
+    bash "$SCRIPT_DIR/scripts/run_adversarial_code_llm.sh" "$BENCHMARK" "${EXTRA_ARGS[@]}"
 }
 
 action_gitea() {
@@ -93,15 +104,15 @@ action_gitea() {
 }
 
 case "$TASK" in
-    mbpp)
-        action_mbpp
+    benchmark)
+        action_benchmark
         ;;
     gitea)
         action_gitea
         ;;
     *)
         echo "Unknown task preset: $TASK"
-        echo "Valid options: mbpp | gitea"
+        echo "Valid options: mbpp | humaneval | gitea"
         exit 1
         ;;
 esac

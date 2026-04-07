@@ -54,7 +54,12 @@ from attacks.instruction_perturbation import instruction_perturbation
 from judge.llm_judge import LLMJudge
 from judge.test_judge import test_judge
 from judge.red_teaming_tactics import apply_tactic
-from agent.selector_policy import ReactSelectorPolicy, SelectorContext
+from agent.selector_policy import (
+    RLBanditSelectorPolicy,
+    RandomSelectorPolicy,
+    ReactSelectorPolicy,
+    SelectorContext,
+)
 from agent.tactic_registry import get_tactic_entry
 from utils.benchmark_loader import (
     build_verification_program,
@@ -74,6 +79,7 @@ from copy import deepcopy
 @task
 def adversarial_code_llm(
     benchmark: str = "mbpp",
+    policy_mode: str = "agent_based_decision",
     temperature: float = 0.5,
     max_iterations: int = 5,
     epochs: int = 1,
@@ -109,7 +115,12 @@ def adversarial_code_llm(
 
     selector_backend = selector_model if selector_model else judge_model
     shared_judge_selector_model = None
-    if use_llm_judge and mutation_strategy == "react" and selector_backend == judge_model:
+    if (
+        use_llm_judge
+        and mutation_strategy == "react"
+        and policy_mode == "agent_based_decision"
+        and selector_backend == judge_model
+    ):
         shared_judge_selector_model = get_model(judge_model)
 
     # Initialize judges
@@ -120,9 +131,16 @@ def adversarial_code_llm(
     # Initialize selector policy (react by default for current phase)
     selector_policy = None
     if mutation_strategy == "react" and use_llm_judge:
-        selector_policy = ReactSelectorPolicy(
-            shared_judge_selector_model or selector_backend
-        )
+        if policy_mode == "agent_based_decision":
+            selector_policy = ReactSelectorPolicy(
+                shared_judge_selector_model or selector_backend
+            )
+        elif policy_mode == "random_choice":
+            selector_policy = RandomSelectorPolicy(environment="benchmark")
+        elif policy_mode == "rl_bandit":
+            selector_policy = RLBanditSelectorPolicy(environment="benchmark")
+        else:
+            raise ValueError(f"Unsupported policy_mode: {policy_mode}")
 
     @solver
     def iterative_attack():
@@ -571,6 +589,7 @@ def adversarial_code_llm(
                     "stop_reason": stop_reason_value,
                     "judge_model": judge_model,
                     "selector_model": selector_model if selector_model else judge_model,
+                    "policy_mode": policy_mode,
                     "timings": timings,
                     "llm_call_counts": llm_call_counts,
                     "use_llm_judge": use_llm_judge,
@@ -732,6 +751,17 @@ def adversarial_code_llm(
                             "environment_support",
                             selector_entry.environment_support,
                         ),
+                        "selector_reasoning": getattr(
+                            selector_decision,
+                            "selector_reasoning",
+                            None,
+                        ),
+                        "selector_name": getattr(
+                            selector_decision,
+                            "selector_name",
+                            policy_mode,
+                        ),
+                        "policy_mode": policy_mode,
                     }
                     selected_tactic_name = normalize_tactic_name(
                         selector_decision.tactic_family

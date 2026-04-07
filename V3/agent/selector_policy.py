@@ -7,11 +7,12 @@ The default concrete policy wraps the existing ReactTacticSelector.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import random
 from typing import Protocol
 from typing import Any
 
 from agent.react_selector import ReactTacticSelector
-from agent.tactic_registry import TacticRegistryEntry
+from agent.tactic_registry import TacticRegistryEntry, get_tactic_registry
 
 
 @dataclass(frozen=True)
@@ -39,7 +40,7 @@ class SelectorDecision:
     renderer_binding: str
     taxonomy_category: str | None
     selector_name: str
-    reasoning: str | None = None
+    selector_reasoning: str | None = None
 
 
 class SelectorPolicy(Protocol):
@@ -73,6 +74,36 @@ class ReactSelectorPolicy:
             environment_support=chosen.environment_support,
             renderer_binding=chosen.renderer_binding,
             taxonomy_category=chosen.taxonomy_category,
-            selector_name="react",
-            reasoning=None,
+            selector_name="agent_based_decision",
+            selector_reasoning=None,
         )
+
+
+class RandomSelectorPolicy:
+    """Random baseline over the registry-backed benchmark action space."""
+
+    def __init__(self, environment: str = "benchmark"):
+        self._environment = environment
+        self._actions = get_tactic_registry(environment)
+
+    async def select(self, context: SelectorContext) -> SelectorDecision:
+        chosen = random.choice(self._actions)
+        return SelectorDecision(
+            tactic_id=chosen.tactic_id,
+            tactic_family=chosen.tactic_family,
+            environment_support=chosen.environment_support,
+            renderer_binding=chosen.renderer_binding,
+            taxonomy_category=chosen.taxonomy_category,
+            selector_name="random_choice",
+            selector_reasoning=None,
+        )
+
+
+class RLBanditSelectorPolicy:
+    """Placeholder policy-mode shell for later bandit implementation."""
+
+    def __init__(self, environment: str = "benchmark"):
+        self._environment = environment
+
+    async def select(self, context: SelectorContext) -> SelectorDecision:
+        raise NotImplementedError("policy_mode='rl_bandit' is reserved for Task 9.")

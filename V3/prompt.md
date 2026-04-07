@@ -79,7 +79,7 @@ The conference path should be implemented in this order:
 
 ---
 
-# [ ] TASK 1 — Normalize conference model routing and defaults
+# [x] TASK 1 — Normalize conference model routing and defaults
 
 ## Goal
 Make the benchmark runnable with the conference-default lightweight model configuration.
