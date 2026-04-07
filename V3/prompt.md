@@ -215,7 +215,7 @@ The benchmark can compare immediate attack effectiveness against multi-step adap
 
 ---
 
-# [ ] TASK 5 — Persist run results for offline analysis and plotting
+# [x] TASK 5 — Persist run results for offline analysis and plotting
 
 ## Goal
 Make long experiments reusable without rerunning them just to regenerate figures.

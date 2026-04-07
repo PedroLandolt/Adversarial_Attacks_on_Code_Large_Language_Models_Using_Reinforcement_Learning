@@ -66,6 +66,7 @@ from utils.benchmark_loader import (
     extract_benchmark_spec,
     load_benchmark_task,
 )
+from utils.results_persistence import persist_run_results
 from utils.syntax_validator import validate_python_syntax
 
 import json
@@ -87,6 +88,8 @@ def adversarial_code_llm(
     epochs: int = 1,
     smoke_test: bool = False,
     debug_force_invalid_syntax: bool = False,  # Internal validation-only hook.
+    results_dir: str = "results",
+    target_model: str | None = None,
     mutation_strategy: str = "random",  # "random", "sequential", "react"
     use_misleading_comments: bool = True,
     use_variable_renaming: bool = True,
@@ -633,6 +636,44 @@ def adversarial_code_llm(
                     "red_teaming_tactic": red_teaming_tactic,
                 }
 
+            def persist_metadata(metadata: dict) -> dict:
+                effective_target_model = (
+                    target_model
+                    or getattr(state, "model", None)
+                    or getattr(state, "model_name", None)
+                    or state.metadata.get("target_model")
+                    or state.metadata.get("model")
+                    or state.metadata.get("model_name")
+                    or os.getenv("MODEL")
+                )
+                effective_target_model = (
+                    str(effective_target_model)
+                    if effective_target_model is not None
+                    else None
+                )
+                persistence = persist_run_results(
+                    results_dir=results_dir,
+                    metadata=metadata,
+                    task_name="adversarial_code_llm",
+                    benchmark=benchmark_spec.benchmark_name,
+                    policy_mode=policy_mode,
+                    experiment_mode=experiment_mode,
+                    target_model=effective_target_model,
+                    judge_model=judge_model,
+                    selector_model=selector_model if selector_model else judge_model,
+                    max_iterations=max_iterations,
+                    sample_id=(
+                        state.metadata.get("sample_id")
+                        or state.metadata.get("task_id")
+                        or state.metadata.get("id")
+                    ),
+                )
+                metadata["run_id"] = persistence["run_id"]
+                metadata["results_path"] = persistence["run_path"]
+                metadata["run_config"] = persistence["run_config"]
+                metadata["run_summary"] = persistence["run_summary"]
+                return metadata
+
             # === BASELINE ===
             baseline_artifact_bundle = None
             final_artifact_bundle = None
@@ -676,14 +717,16 @@ def adversarial_code_llm(
                         error=baseline_syntax_result["syntax_error"],
                         syntax_result=baseline_syntax_result,
                     )
-                    state.metadata = build_run_metadata(
-                        strategy_name=mutation_strategy,
-                        baseline_record=baseline_record,
-                        all_attempts=attempts,
-                        final_artifact_bundle=baseline_artifact_bundle,
-                        attack_succeeded_value=False,
-                        successful_iteration_value=None,
-                        stop_reason_value="baseline_invalid_syntax",
+                    state.metadata = persist_metadata(
+                        build_run_metadata(
+                            strategy_name=mutation_strategy,
+                            baseline_record=baseline_record,
+                            all_attempts=attempts,
+                            final_artifact_bundle=baseline_artifact_bundle,
+                            attack_succeeded_value=False,
+                            successful_iteration_value=None,
+                            stop_reason_value="baseline_invalid_syntax",
+                        )
                     )
                     return state
 
@@ -717,14 +760,16 @@ def adversarial_code_llm(
                     error=error_text,
                 )
 
-                state.metadata = build_run_metadata(
-                    strategy_name=mutation_strategy,
-                    baseline_record=baseline_record,
-                    all_attempts=attempts,
-                    final_artifact_bundle=None,
-                    attack_succeeded_value=False,
-                    successful_iteration_value=None,
-                    stop_reason_value="baseline_error",
+                state.metadata = persist_metadata(
+                    build_run_metadata(
+                        strategy_name=mutation_strategy,
+                        baseline_record=baseline_record,
+                        all_attempts=attempts,
+                        final_artifact_bundle=None,
+                        attack_succeeded_value=False,
+                        successful_iteration_value=None,
+                        stop_reason_value="baseline_error",
+                    )
                 )
                 return state
 
@@ -1321,14 +1366,16 @@ def adversarial_code_llm(
                 # evaluated in the benchmark loop so logs reflect the recorded metadata.
                 if hasattr(state, "output") and state.output and hasattr(state.output, "completion"):
                     state.output.completion = final_artifact_bundle["review_artifact"]
-                state.metadata = build_run_metadata(
-                    strategy_name="react",
-                    baseline_record=baseline_record,
-                    all_attempts=attempts,
-                    final_artifact_bundle=final_artifact_bundle,
-                    attack_succeeded_value=attack_succeeded,
-                    successful_iteration_value=successful_iteration,
-                    stop_reason_value=stop_reason,
+                state.metadata = persist_metadata(
+                    build_run_metadata(
+                        strategy_name="react",
+                        baseline_record=baseline_record,
+                        all_attempts=attempts,
+                        final_artifact_bundle=final_artifact_bundle,
+                        attack_succeeded_value=attack_succeeded,
+                        successful_iteration_value=successful_iteration,
+                        stop_reason_value=stop_reason,
+                    )
                 )
                 state.metadata["tactics_tried"] = previous_tactics
                 timings["metadata_finalization_seconds"] += time.perf_counter() - metadata_finalization_start
@@ -1584,14 +1631,16 @@ def adversarial_code_llm(
                 final_artifact_bundle = baseline_artifact_bundle
             if hasattr(state, "output") and state.output and hasattr(state.output, "completion"):
                 state.output.completion = final_artifact_bundle["review_artifact"]
-            state.metadata = build_run_metadata(
-                strategy_name=mutation_strategy,
-                baseline_record=baseline_record,
-                all_attempts=attempts,
-                final_artifact_bundle=final_artifact_bundle,
-                attack_succeeded_value=attack_succeeded,
-                successful_iteration_value=successful_iteration,
-                stop_reason_value="attack_succeeded" if attack_succeeded else "max_iterations_reached",
+            state.metadata = persist_metadata(
+                build_run_metadata(
+                    strategy_name=mutation_strategy,
+                    baseline_record=baseline_record,
+                    all_attempts=attempts,
+                    final_artifact_bundle=final_artifact_bundle,
+                    attack_succeeded_value=attack_succeeded,
+                    successful_iteration_value=successful_iteration,
+                    stop_reason_value="attack_succeeded" if attack_succeeded else "max_iterations_reached",
+                )
             )
             state.metadata["total_mutations"] = len(attempts)
 

@@ -1,4 +1,6 @@
 import asyncio
+import json
+import shutil
 import subprocess
 import sys
 import types
@@ -6,6 +8,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+from uuid import uuid4
 
 
 def _install_stub_modules() -> None:
@@ -95,6 +98,7 @@ from utils.benchmark_loader import (
     extract_benchmark_spec,
     load_benchmark_task,
 )
+from utils.results_persistence import load_persisted_runs
 
 
 class FakeSandbox:
@@ -172,6 +176,14 @@ class FakeJudge:
             }
         )
         return self._decisions.pop(0)
+
+
+class FakeModelName:
+    def __init__(self, value: str):
+        self.value = value
+
+    def __str__(self) -> str:
+        return self.value
 
 
 class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
@@ -596,6 +608,110 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(metadata["all_attempts"]), 2)
         self.assertEqual(metadata["stop_reason"], "max_iterations_reached")
         self.assertEqual(generate_call_count, 3)
+
+    async def test_results_are_persisted_for_two_runs_and_can_be_read_offline(self):
+        temp_dir = Path.cwd() / ".tmp_test_results" / uuid4().hex
+        results_dir = str(temp_dir / "results")
+        try:
+            target_model = FakeModelName("ollama/qwen3.5:0.8b")
+
+            mbpp_sandbox = FakeSandbox()
+            mbpp_task = benchmark_module.adversarial_code_llm(
+                benchmark="mbpp",
+                mutation_strategy="disabled",
+                use_llm_judge=False,
+                experiment_mode="one_shot",
+                results_dir=results_dir,
+                target_model=target_model,
+            )
+            mbpp_state = DummyState(
+                prompt="Write add_one.",
+                test_list=["assert add_one(1) == 2"],
+                metadata={"test_list": ["assert add_one(1) == 2"], "sample_id": "mbpp_sample"},
+                target=["assert add_one(1) == 2"],
+            )
+
+            async def mbpp_generate_fn(_state):
+                return FakeGenerateResponse("def add_one(x):\n    return x + 1\n")
+
+            with (
+                patch.object(benchmark_module, "sandbox", return_value=mbpp_sandbox),
+                patch.object(
+                    benchmark_module,
+                    "validate_python_syntax",
+                    return_value={"syntax_valid": True, "syntax_error": None},
+                ),
+            ):
+                await mbpp_task.solver[0](mbpp_state, mbpp_generate_fn)
+
+            humaneval_sandbox = FakeSandbox()
+            humaneval_task = benchmark_module.adversarial_code_llm(
+                benchmark="humaneval",
+                mutation_strategy="disabled",
+                use_llm_judge=False,
+                experiment_mode="iterative",
+                results_dir=results_dir,
+                target_model=target_model,
+            )
+            humaneval_state = DummyState(
+                prompt="Write increment.",
+                metadata={
+                    "test": "def check(candidate):\n    assert candidate(1) == 2\n",
+                    "entry_point": "increment",
+                    "sample_id": "humaneval_sample",
+                },
+                target="def check(candidate):\n    assert candidate(1) == 2\n",
+            )
+
+            async def humaneval_generate_fn(_state):
+                return FakeGenerateResponse("def increment(x):\n    return x + 1\n")
+
+            with (
+                patch.object(benchmark_module, "sandbox", return_value=humaneval_sandbox),
+                patch.object(
+                    benchmark_module,
+                    "validate_python_syntax",
+                    return_value={"syntax_valid": True, "syntax_error": None},
+                ),
+            ):
+                await humaneval_task.solver[0](humaneval_state, humaneval_generate_fn)
+
+            run_dirs = sorted(Path(results_dir).iterdir())
+            self.assertEqual(len(run_dirs), 2)
+            loaded_runs = load_persisted_runs(results_dir)
+            self.assertEqual(len(loaded_runs), 2)
+
+            loaded_configs = [run["run_config"] for run in loaded_runs]
+            loaded_summaries = [run["run_summary"] for run in loaded_runs]
+            loaded_attempt_counts = [len(run["attempts"]) for run in loaded_runs]
+
+            self.assertEqual(
+                {config["benchmark"] for config in loaded_configs},
+                {"mbpp", "humaneval"},
+            )
+            self.assertEqual(
+                {config["experiment_mode"] for config in loaded_configs},
+                {"one_shot", "iterative"},
+            )
+            self.assertEqual(
+                {config["target_model"] for config in loaded_configs},
+                {"ollama/qwen3.5:0.8b"},
+            )
+            self.assertTrue(all(summary["num_samples"] == 1 for summary in loaded_summaries))
+            self.assertTrue(all(summary["run_id"] for summary in loaded_summaries))
+            self.assertTrue(all(count >= 1 for count in loaded_attempt_counts))
+            self.assertTrue(
+                all(
+                    attempt["reward"] is not None
+                    for run in loaded_runs
+                    for attempt in run["attempts"]
+                )
+            )
+            self.assertTrue(
+                all("average_reward_by_arm" in summary for summary in loaded_summaries)
+            )
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":
