@@ -183,7 +183,7 @@ The benchmark can distinguish:
 
 ---
 
-# [ ] TASK 4 — Define one-shot and iterative experiment modes
+# [x] TASK 4 — Define one-shot and iterative experiment modes
 
 ## Goal
 Support the two evaluation modes requested for the conference.

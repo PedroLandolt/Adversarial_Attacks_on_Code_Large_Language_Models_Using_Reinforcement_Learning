@@ -3,10 +3,11 @@ inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   -T benchmark=mbpp \
   -T mutation_strategy=react \
   -T policy_mode=agent_based_decision \
+  -T experiment_mode=one_shot \
   -T use_llm_judge=True \
   -T judge_model=ollama/qwen3.5:0.8b \
   -T selector_model=ollama/qwen3.5:0.8b \
-  -T max_iterations=1 \
+  -T max_iterations=3 \
   --max-samples 1 \
   --limit 1
 
@@ -16,10 +17,42 @@ inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   --model ollama/qwen3.5:0.8b \
   -T benchmark=mbpp \
   -T mutation_strategy=react \
-  -T policy_mode=random_choice \
+  -T policy_mode=agent_based_decision \
+  -T experiment_mode=iterative \
   -T use_llm_judge=True \
   -T judge_model=ollama/qwen3.5:0.8b \
   -T selector_model=ollama/qwen3.5:0.8b \
-  -T max_iterations=1 \
+  -T max_iterations=3 \
+  --max-samples 1 \
+  --limit 1
+
+
+# ----------------------------------------------------------------
+
+inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen3.5:0.8b \
+  -T benchmark=mbpp \
+  -T mutation_strategy=react \
+  -T policy_mode=random_choice \
+  -T experiment_mode=one_shot \
+  -T use_llm_judge=True \
+  -T judge_model=ollama/qwen3.5:0.8b \
+  -T selector_model=ollama/qwen3.5:0.8b \
+  -T max_iterations=3 \
+  --max-samples 1 \
+  --limit 1
+
+# ----------------------------------------------------------------
+
+inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen3.5:0.8b \
+  -T benchmark=mbpp \
+  -T mutation_strategy=react \
+  -T policy_mode=random_choice \
+  -T experiment_mode=iterative \
+  -T use_llm_judge=True \
+  -T judge_model=ollama/qwen3.5:0.8b \
+  -T selector_model=ollama/qwen3.5:0.8b \
+  -T max_iterations=3 \
   --max-samples 1 \
   --limit 1

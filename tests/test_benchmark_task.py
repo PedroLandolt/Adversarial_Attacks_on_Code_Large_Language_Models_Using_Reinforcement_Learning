@@ -496,6 +496,107 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
         ):
             self.assertIn(required_key, metadata)
 
+    async def test_one_shot_experiment_mode_limits_adversarial_attempts_to_one(self):
+        sandbox = FakeSandbox()
+        judge_decisions = [
+            SimpleNamespace(decision="FAIL", confidence=0.2, reasoning="baseline fail", vulnerability="none"),
+            SimpleNamespace(decision="FAIL", confidence=0.3, reasoning="iteration fail", vulnerability="none"),
+        ]
+        state = DummyState(
+            prompt="Write add_one.",
+            test_list=["assert add_one(1) == 3"],
+        )
+        generate_call_count = 0
+
+        async def generate_fn(_state):
+            nonlocal generate_call_count
+            generate_call_count += 1
+            return FakeGenerateResponse("def add_one(x):\n    return x + 1\n")
+
+        with (
+            patch.object(benchmark_module, "sandbox", return_value=sandbox),
+            patch.object(
+                benchmark_module,
+                "validate_python_syntax",
+                return_value={"syntax_valid": True, "syntax_error": None},
+            ),
+            patch.object(benchmark_module, "ReactSelectorPolicy", FakeSelectorPolicy),
+            patch.object(
+                benchmark_module,
+                "LLMJudge",
+                lambda backend: FakeJudge(backend, decisions=judge_decisions),
+            ),
+        ):
+            task = benchmark_module.adversarial_code_llm(
+                mutation_strategy="react",
+                experiment_mode="one_shot",
+                use_llm_judge=True,
+                judge_model="same-backend",
+                selector_model="same-backend",
+                max_iterations=3,
+            )
+            solve = task.solver[0]
+            solved_state = await solve(state, generate_fn)
+
+        metadata = solved_state.metadata
+        self.assertEqual(metadata["experiment_mode"], "one_shot")
+        self.assertEqual(metadata["effective_max_iterations"], 1)
+        self.assertEqual(metadata["total_iterations"], 1)
+        self.assertEqual(len(metadata["all_attempts"]), 1)
+        self.assertEqual(metadata["stop_reason"], "max_iterations_reached")
+        self.assertEqual(generate_call_count, 2)
+
+    async def test_iterative_experiment_mode_preserves_configured_iteration_budget(self):
+        sandbox = FakeSandbox()
+        judge_decisions = [
+            SimpleNamespace(decision="FAIL", confidence=0.2, reasoning="baseline fail", vulnerability="none"),
+            SimpleNamespace(decision="FAIL", confidence=0.3, reasoning="iteration 1 fail", vulnerability="none"),
+            SimpleNamespace(decision="FAIL", confidence=0.4, reasoning="iteration 2 fail", vulnerability="none"),
+        ]
+        state = DummyState(
+            prompt="Write add_one.",
+            test_list=["assert add_one(1) == 3"],
+        )
+        generate_call_count = 0
+
+        async def generate_fn(_state):
+            nonlocal generate_call_count
+            generate_call_count += 1
+            return FakeGenerateResponse("def add_one(x):\n    return x + 1\n")
+
+        with (
+            patch.object(benchmark_module, "sandbox", return_value=sandbox),
+            patch.object(
+                benchmark_module,
+                "validate_python_syntax",
+                return_value={"syntax_valid": True, "syntax_error": None},
+            ),
+            patch.object(benchmark_module, "ReactSelectorPolicy", FakeSelectorPolicy),
+            patch.object(
+                benchmark_module,
+                "LLMJudge",
+                lambda backend: FakeJudge(backend, decisions=judge_decisions),
+            ),
+        ):
+            task = benchmark_module.adversarial_code_llm(
+                mutation_strategy="react",
+                experiment_mode="iterative",
+                use_llm_judge=True,
+                judge_model="same-backend",
+                selector_model="same-backend",
+                max_iterations=2,
+            )
+            solve = task.solver[0]
+            solved_state = await solve(state, generate_fn)
+
+        metadata = solved_state.metadata
+        self.assertEqual(metadata["experiment_mode"], "iterative")
+        self.assertEqual(metadata["effective_max_iterations"], 2)
+        self.assertEqual(metadata["total_iterations"], 2)
+        self.assertEqual(len(metadata["all_attempts"]), 2)
+        self.assertEqual(metadata["stop_reason"], "max_iterations_reached")
+        self.assertEqual(generate_call_count, 3)
+
 
 if __name__ == "__main__":
     unittest.main()

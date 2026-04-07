@@ -81,6 +81,7 @@ from copy import deepcopy
 def adversarial_code_llm(
     benchmark: str = "mbpp",
     policy_mode: str = "agent_based_decision",
+    experiment_mode: str = "iterative",
     temperature: float = 0.5,
     max_iterations: int = 5,
     epochs: int = 1,
@@ -103,9 +104,16 @@ def adversarial_code_llm(
     - "sequential": Sequential heuristic mutations (original)
     - "react": ReAct loop with LLM selector choosing red-teaming tactics
 
+    experiment_mode options:
+    - "one_shot": single adversarial attempt after baseline
+    - "iterative": adaptive loop up to max_iterations
+
     debug_force_invalid_syntax is for internal validation/regression checks only.
     It is not part of the normal benchmark experiment path.
     """
+
+    if experiment_mode not in {"one_shot", "iterative"}:
+        raise ValueError("experiment_mode must be one of: 'one_shot', 'iterative'.")
 
     base_task = load_benchmark_task(benchmark, temperature=temperature)
 
@@ -152,7 +160,9 @@ def adversarial_code_llm(
         async def solve(state: TaskState, generate_fn):
             attempts = []
             original_messages = deepcopy(state.messages)
-            effective_max_iterations = 1 if smoke_test else max_iterations
+            effective_max_iterations = (
+                1 if smoke_test or experiment_mode == "one_shot" else max_iterations
+            )
             timings = {
                 "baseline_generation_seconds": 0.0,
                 "baseline_llm_judge_seconds": 0.0,
@@ -593,6 +603,7 @@ def adversarial_code_llm(
                 return {
                     "strategy": strategy_name,
                     "smoke_test": smoke_test,
+                    "experiment_mode": experiment_mode,
                     "effective_max_iterations": effective_max_iterations,
                     "benchmark": benchmark_spec.benchmark_name,
                     "benchmark_spec": {
