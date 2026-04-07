@@ -195,6 +195,11 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(benchmark_module, "sandbox", return_value=sandbox),
+            patch.object(
+                benchmark_module,
+                "validate_python_syntax",
+                return_value={"syntax_valid": True, "syntax_error": None},
+            ),
             patch.object(benchmark_module, "RandomSelectorPolicy", FakeRandomSelectorPolicy),
             patch.object(
                 benchmark_module,
@@ -307,7 +312,14 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                 "\nThis should work for the sample tests.\n"
             )
 
-        with patch.object(benchmark_module, "sandbox", return_value=sandbox):
+        with (
+            patch.object(benchmark_module, "sandbox", return_value=sandbox),
+            patch.object(
+                benchmark_module,
+                "validate_python_syntax",
+                return_value={"syntax_valid": True, "syntax_error": None},
+            ),
+        ):
             solved_state = await solve(state, generate_fn)
 
         baseline = solved_state.metadata["baseline"]
@@ -321,6 +333,45 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(sandbox.programs[0].startswith(baseline["executable_code"]))
         self.assertNotIn("Here's a Python function", sandbox.programs[0])
         self.assertIn('assert remove_Occ("hello","l") == "heo"', sandbox.programs[0])
+
+    async def test_invalid_syntax_is_recorded_and_skips_test_execution(self):
+        sandbox = FakeSandbox()
+        task = benchmark_module.adversarial_code_llm(
+            mutation_strategy="disabled",
+            use_llm_judge=False,
+        )
+        solve = task.solver[0]
+        state = DummyState(
+            prompt="Write broken.",
+            test_list=["assert broken() == 1"],
+        )
+
+        async def generate_fn(_state):
+            return FakeGenerateResponse("def broken(:\n    return 1\n")
+
+        with (
+            patch.object(benchmark_module, "sandbox", return_value=sandbox),
+            patch.object(
+                benchmark_module,
+                "validate_python_syntax",
+                return_value={
+                    "syntax_valid": False,
+                    "syntax_error": "tree-sitter detected invalid Python syntax: (module (ERROR))",
+                },
+            ),
+        ):
+            solved_state = await solve(state, generate_fn)
+
+        metadata = solved_state.metadata
+        baseline = metadata["baseline"]
+        self.assertEqual(metadata["stop_reason"], "baseline_invalid_syntax")
+        self.assertFalse(baseline["syntax_valid"])
+        self.assertEqual(
+            baseline["syntax_result"]["syntax_error"],
+            "tree-sitter detected invalid Python syntax: (module (ERROR))",
+        )
+        self.assertIsNone(baseline["test_result"])
+        self.assertEqual(len(sandbox.programs), 0)
 
     async def test_react_attempt_keeps_artifact_aligned_across_record_judge_and_execution(self):
         sandbox = FakeSandbox()
@@ -343,6 +394,11 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(benchmark_module, "sandbox", return_value=sandbox),
+            patch.object(
+                benchmark_module,
+                "validate_python_syntax",
+                return_value={"syntax_valid": True, "syntax_error": None},
+            ),
             patch.object(benchmark_module, "ReactSelectorPolicy", FakeSelectorPolicy),
             patch.object(
                 benchmark_module,
@@ -397,6 +453,11 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(benchmark_module, "sandbox", return_value=sandbox),
+            patch.object(
+                benchmark_module,
+                "validate_python_syntax",
+                return_value={"syntax_valid": True, "syntax_error": None},
+            ),
             patch.object(benchmark_module, "ReactSelectorPolicy", FakeSelectorPolicy),
             patch.object(
                 benchmark_module,

@@ -66,6 +66,7 @@ from utils.benchmark_loader import (
     extract_benchmark_spec,
     load_benchmark_task,
 )
+from utils.syntax_validator import validate_python_syntax
 
 import json
 import os
@@ -84,6 +85,7 @@ def adversarial_code_llm(
     max_iterations: int = 5,
     epochs: int = 1,
     smoke_test: bool = False,
+    debug_force_invalid_syntax: bool = False,  # Internal validation-only hook.
     mutation_strategy: str = "random",  # "random", "sequential", "react"
     use_misleading_comments: bool = True,
     use_variable_renaming: bool = True,
@@ -100,6 +102,9 @@ def adversarial_code_llm(
     - "random": Random heuristic mutations (original)
     - "sequential": Sequential heuristic mutations (original)
     - "react": ReAct loop with LLM selector choosing red-teaming tactics
+
+    debug_force_invalid_syntax is for internal validation/regression checks only.
+    It is not part of the normal benchmark experiment path.
     """
 
     base_task = load_benchmark_task(benchmark, temperature=temperature)
@@ -256,6 +261,19 @@ def adversarial_code_llm(
                     "pass": bool(result.get("pass", False)),
                     "stdout": str(result.get("stdout", "")),
                     "stderr": str(result.get("stderr", "")),
+                }
+
+            def clone_syntax_result(result: dict | None) -> dict | None:
+                """Return a stable copy of syntax-validation metadata."""
+                if result is None:
+                    return None
+                return {
+                    "syntax_valid": bool(result.get("syntax_valid", False)),
+                    "syntax_error": (
+                        str(result.get("syntax_error"))
+                        if result.get("syntax_error") is not None
+                        else None
+                    ),
                 }
 
             def build_artifact_bundle(
@@ -417,6 +435,7 @@ def adversarial_code_llm(
             def canonicalize_failure_stage(raw_stage: str | None) -> str | None:
                 """Map internal step names to the canonical Task 5 failure stages."""
                 stage_map = {
+                    "syntax_validation": "syntax_validation",
                     "prepare_selector_input": "selector_choice",
                     "select_tactic": "selector_choice",
                     "mutate_prompt": "generation",
@@ -529,6 +548,7 @@ def adversarial_code_llm(
                 llm_decision_obj=None,
                 stop_reason: str | None = None,
                 error: str | None = None,
+                syntax_result: dict | None = None,
             ) -> dict:
                 """Build stable baseline metadata for run-level inspection."""
                 artifact_bundle = artifact_bundle or {}
@@ -542,6 +562,12 @@ def adversarial_code_llm(
                     "response": artifact_bundle.get("raw_completion"),
                     "attack_message": artifact_bundle.get("review_artifact"),
                     "construction_metadata": artifact_bundle.get("construction_metadata"),
+                    "syntax_result": clone_syntax_result(syntax_result),
+                    "syntax_valid": (
+                        bool(syntax_result.get("syntax_valid", False))
+                        if syntax_result is not None
+                        else None
+                    ),
                     "test_result": clone_test_result(test_result),
                     "test_judge": serialize_test_judge(test_decision_obj),
                     "llm_judge": serialize_llm_judge(llm_decision_obj),
@@ -603,6 +629,7 @@ def adversarial_code_llm(
             llm_decision = None
             test_result = None
             baseline_record = None
+            baseline_syntax_result = None
 
             try:
                 baseline_gen_start = time.perf_counter()
@@ -618,8 +645,36 @@ def adversarial_code_llm(
                         baseline_output = str(baseline_response.output)
                 else:
                     baseline_output = str(baseline_response)
+                if debug_force_invalid_syntax:
+                    # Internal validation-only hook for reproducible syntax-gate checks.
+                    baseline_output = "def broken(:\n    return 1\n"
                 baseline_artifact_bundle = build_artifact_bundle(baseline_output)
                 final_artifact_bundle = baseline_artifact_bundle
+                baseline_syntax_result = validate_python_syntax(
+                    baseline_artifact_bundle["executable_code"]
+                )
+                baseline_artifact_bundle["syntax_result"] = baseline_syntax_result
+
+                if not baseline_syntax_result["syntax_valid"]:
+                    baseline_record = build_baseline_record(
+                        artifact_bundle=baseline_artifact_bundle,
+                        test_result=None,
+                        test_decision_obj=None,
+                        llm_decision_obj=None,
+                        stop_reason="baseline_invalid_syntax",
+                        error=baseline_syntax_result["syntax_error"],
+                        syntax_result=baseline_syntax_result,
+                    )
+                    state.metadata = build_run_metadata(
+                        strategy_name=mutation_strategy,
+                        baseline_record=baseline_record,
+                        all_attempts=attempts,
+                        final_artifact_bundle=baseline_artifact_bundle,
+                        attack_succeeded_value=False,
+                        successful_iteration_value=None,
+                        stop_reason_value="baseline_invalid_syntax",
+                    )
+                    return state
 
                 # Deterministic execution remains the ground-truth benchmark signal.
                 test_result = await execute_benchmark_tests(
@@ -669,6 +724,7 @@ def adversarial_code_llm(
                     test_result=test_result,
                     test_decision_obj=test_decision,
                     llm_decision_obj=llm_decision,
+                    syntax_result=baseline_syntax_result,
                 )
 
             # === REACT LOOP ===
@@ -803,12 +859,26 @@ def adversarial_code_llm(
                         test_decision_obj=last_test_result,
                         llm_decision_obj=last_llm_result,
                     )
+                    artifact_bundle["syntax_result"] = validate_python_syntax(
+                        artifact_bundle["executable_code"]
+                    )
                     artifact_under_review = artifact_bundle["review_artifact"]
 
                     # Inspect-visible output must stay aligned with the exact artifact that
                     # deterministic execution and the LLM judge both evaluate in this path.
                     if hasattr(state, "output") and state.output and hasattr(state.output, "completion"):
                         state.output.completion = artifact_under_review
+
+                    if not artifact_bundle["syntax_result"]["syntax_valid"]:
+                        return (
+                            artifact_bundle,
+                            None,
+                            None,
+                            None,
+                            False,
+                            applied_tactic_name,
+                            True,
+                        )
 
                     ctx["failure_stage"] = "test_execution"
                     test_result_iter = await execute_benchmark_tests(
@@ -837,6 +907,7 @@ def adversarial_code_llm(
                         test_result_iter,
                         succeeded,
                         applied_tactic_name,
+                        False,
                     )
 
                 def build_react_attempt_record(
@@ -873,6 +944,14 @@ def adversarial_code_llm(
                         "response": artifact_bundle.get("raw_completion"),
                         "attack_message": artifact_bundle.get("review_artifact"),
                         "construction_metadata": artifact_bundle.get("construction_metadata"),
+                        "syntax_result": clone_syntax_result(
+                            artifact_bundle.get("syntax_result")
+                        ),
+                        "syntax_valid": (
+                            bool(artifact_bundle.get("syntax_result", {}).get("syntax_valid", False))
+                            if artifact_bundle.get("syntax_result") is not None
+                            else None
+                        ),
                         "test_result": clone_test_result(test_result_obj),
                         "previous_tactics": previous_tactics_before,
                         "attack_success": attack_success,
@@ -956,6 +1035,16 @@ def adversarial_code_llm(
                         "selected_tactic": selected_tactic,
                         "previous_tactics": previous_tactics_before,
                         "artifact_summary": summarize_artifact(artifact_under_review),
+                        "syntax_valid": (
+                            bool((trace.get("artifact_bundle") or {}).get("syntax_result", {}).get("syntax_valid", False))
+                            if (trace.get("artifact_bundle") or {}).get("syntax_result") is not None
+                            else None
+                        ),
+                        "syntax_error": (
+                            (trace.get("artifact_bundle") or {}).get("syntax_result", {}).get("syntax_error")
+                            if (trace.get("artifact_bundle") or {}).get("syntax_result") is not None
+                            else None
+                        ),
                         "test_result": summarize_test_result(test_result_obj),
                         "test_judge_decision": (
                             test_decision_obj.decision if test_decision_obj else None
@@ -1078,12 +1167,60 @@ def adversarial_code_llm(
                             test_result_iter,
                             attack_succeeded,
                             ctx["applied_tactic_name"],
+                            syntax_invalid,
                         ) = await apply_and_evaluate_tactic(
                             ctx["selected_tactic_name"],
                             iteration,
                             ctx,
                         )
                         ctx["attacked_code"] = ctx["artifact_bundle"]["review_artifact"]
+                        if syntax_invalid:
+                            ctx["failure_stage"] = "syntax_validation"
+                            attempts.append(
+                                build_react_attempt_record(
+                                    iteration=iteration,
+                                    selected_tactic_name=ctx["selected_tactic_name"],
+                                    applied_tactic_name=ctx["applied_tactic_name"],
+                                    previous_tactics_before=ctx["previous_tactics_before"],
+                                    artifact_bundle=ctx["artifact_bundle"],
+                                    attack_success=False,
+                                    failure_stage="syntax_validation",
+                                    trace=enrich_iteration_trace(
+                                        trace=build_iteration_trace(ctx),
+                                        selected_tactic=ctx["selected_tactic_name"],
+                                        previous_tactics_before=ctx["previous_tactics_before"],
+                                        artifact_under_review=ctx["attacked_code"],
+                                        test_result_obj=None,
+                                        test_decision_obj=None,
+                                        llm_decision_obj=None,
+                                        stop_reason_value="invalid_syntax",
+                                        error=ctx["artifact_bundle"]["syntax_result"]["syntax_error"],
+                                        failure_stage="syntax_validation",
+                                    ),
+                                    test_decision_obj=None,
+                                    llm_decision_obj=None,
+                                    test_result_obj=None,
+                                    error=ctx["artifact_bundle"]["syntax_result"]["syntax_error"],
+                                    stop_reason="invalid_syntax",
+                                )
+                            )
+                            final_artifact_bundle = ctx["artifact_bundle"]
+                            previous_tactics.append(ctx["applied_tactic_name"])
+                            previous_attempts_history.append({
+                                "selected_tactic": ctx["selected_tactic_name"],
+                                "applied_tactic": ctx["applied_tactic_name"],
+                                "tactic": ctx["applied_tactic_name"],
+                                "selected_tactic_action": serialize_tactic_action(ctx["selected_tactic_name"]),
+                                "applied_tactic_action": serialize_tactic_action(ctx["applied_tactic_name"]),
+                                "test_decision": "SYNTAX_INVALID",
+                                "test_confidence": None,
+                                "llm_decision": None,
+                                "llm_confidence": None,
+                                "llm_reasoning": None,
+                                "llm_vulnerability": "syntax_invalid",
+                                "attack_success": False,
+                            })
+                            continue
                         ctx["failure_stage"] = None
 
                         record_iteration_success(
@@ -1229,8 +1366,61 @@ def adversarial_code_llm(
                         test_decision_obj=test_decision,
                         llm_decision_obj=llm_decision,
                     )
+                    artifact_bundle["syntax_result"] = validate_python_syntax(
+                        artifact_bundle["executable_code"]
+                    )
                     mutated_output = artifact_bundle["review_artifact"]
                     final_artifact_bundle = artifact_bundle
+
+                    if not artifact_bundle["syntax_result"]["syntax_valid"]:
+                        attempts.append({
+                            "iteration": iteration,
+                            "mutation": mutation_name,
+                            "tactic": red_teaming_tactic,
+                            "selected_tactic_action": serialize_tactic_action(red_teaming_tactic),
+                            "applied_tactic_action": serialize_tactic_action(red_teaming_tactic),
+                            "failure_stage": "syntax_validation",
+                            "raw_completion": artifact_bundle["raw_completion"],
+                            "executable_code": artifact_bundle["executable_code"],
+                            "review_artifact": artifact_bundle["review_artifact"],
+                            "artifact_under_review": mutated_output,
+                            "prompt": problem_text,
+                            "response": artifact_bundle["raw_completion"],
+                            "attack_message": artifact_bundle["review_artifact"],
+                            "construction_metadata": artifact_bundle["construction_metadata"],
+                            "syntax_result": clone_syntax_result(artifact_bundle["syntax_result"]),
+                            "syntax_valid": False,
+                            "test_result": None,
+                            "stop_reason": "invalid_syntax",
+                            "attack_success": False if use_llm_judge else None,
+                            "error": artifact_bundle["syntax_result"]["syntax_error"],
+                            "trace": {
+                                "steps": iteration_steps,
+                                "step_statuses": build_step_statuses(
+                                    iteration_steps,
+                                    failed_step="apply_optional_red_teaming_tactic",
+                                ),
+                                "summary": {
+                                    "selected_tactic": red_teaming_tactic,
+                                    "previous_tactics": [
+                                        str(a.get("tactic"))
+                                        for a in attempts
+                                        if a.get("tactic") is not None
+                                    ],
+                                    "artifact_summary": summarize_artifact(mutated_output),
+                                    "syntax_valid": False,
+                                    "syntax_error": artifact_bundle["syntax_result"]["syntax_error"],
+                                    "test_result": None,
+                                    "test_judge_decision": None,
+                                    "llm_judge_decision": None,
+                                    "llm_judge_confidence": None,
+                                    "failure_stage": "syntax_validation",
+                                    "stop_reason": "invalid_syntax",
+                                    "error": artifact_bundle["syntax_result"]["syntax_error"],
+                                },
+                            },
+                        })
+                        continue
 
                     # Test judge
                     failure_stage = "test_execution"
@@ -1286,6 +1476,12 @@ def adversarial_code_llm(
                         "response": artifact_bundle["raw_completion"],
                         "attack_message": artifact_bundle["review_artifact"],
                         "construction_metadata": artifact_bundle["construction_metadata"],
+                        "syntax_result": clone_syntax_result(artifact_bundle.get("syntax_result")),
+                        "syntax_valid": (
+                            bool(artifact_bundle.get("syntax_result", {}).get("syntax_valid", False))
+                            if artifact_bundle.get("syntax_result") is not None
+                            else None
+                        ),
                         "test_result": clone_test_result(test_result),
                         "stop_reason": "attack_succeeded" if attack_success_iter else None,
                         "test_judge": serialize_test_judge(test_decision),

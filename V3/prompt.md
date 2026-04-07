@@ -110,7 +110,7 @@ A contributor can run the conference benchmark path without editing multiple fil
 
 ---
 
-# [ ] TASK 2 — Formalize policy modes through the selector boundary
+# [x] TASK 2 — Formalize policy modes through the selector boundary
 
 ## Goal
 Make policy comparison explicit and thesis-paper ready.
@@ -148,7 +148,7 @@ The selector policy becomes an experimental variable instead of an implicit impl
 
 ---
 
-# [ ] TASK 3 — Add tree-sitter syntax validation before deterministic execution
+# [x] TASK 3 — Add tree-sitter syntax validation before deterministic execution
 
 ## Goal
 Stop wasting iterations on structurally invalid generated code.
