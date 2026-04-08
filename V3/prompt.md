@@ -279,7 +279,7 @@ Plots and tables can be regenerated offline from saved results.
 
 ---
 
-# [ ] TASK 6 — Record selector reasoning in the shared policy decision shape
+# [x] TASK 6 — Record selector reasoning in the shared policy decision shape
 
 ## Goal
 Capture short interpretable reasoning for tactic choice.
@@ -309,7 +309,7 @@ The paper can show not only what action was chosen, but also why the selector cl
 
 ---
 
-# [ ] TASK 7 — Implement random-choice baseline through the shared policy contract
+# [x] TASK 7 — Implement random-choice baseline through the shared policy contract
 
 ## Goal
 Create the simplest non-agent baseline for comparison.

@@ -257,6 +257,73 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(selector_output["renderer_binding"], "narrative_roleplay")
         self.assertIsNone(selector_output["selector_reasoning"])
 
+    async def test_random_choice_policy_mode_works_on_humaneval_through_shared_contract(self):
+        sandbox = FakeSandbox()
+        judge_decisions = [
+            SimpleNamespace(decision="FAIL", confidence=0.2, reasoning="baseline fail", vulnerability="none"),
+            SimpleNamespace(decision="FAIL", confidence=0.3, reasoning="iteration fail", vulnerability="none"),
+        ]
+        state = DummyState(
+            prompt="Write increment.",
+            metadata={
+                "test": "def check(candidate):\n    assert candidate(1) == 2\n",
+                "entry_point": "increment",
+                "sample_id": "humaneval_random_choice_sample",
+            },
+            target="def check(candidate):\n    assert candidate(1) == 2\n",
+        )
+        generated = [
+            "```python\ndef increment(x):\n    return x + 1\n```",
+            "```python\ndef increment(x):\n    return x + 1\n```",
+        ]
+
+        async def generate_fn(_state):
+            return FakeGenerateResponse(generated.pop(0))
+
+        with (
+            patch.object(benchmark_module, "sandbox", return_value=sandbox),
+            patch.object(
+                benchmark_module,
+                "validate_python_syntax",
+                return_value={"syntax_valid": True, "syntax_error": None},
+            ),
+            patch.object(benchmark_module, "RandomSelectorPolicy", FakeRandomSelectorPolicy),
+            patch.object(
+                benchmark_module,
+                "LLMJudge",
+                lambda backend: FakeJudge(backend, decisions=judge_decisions),
+            ),
+        ):
+            task = benchmark_module.adversarial_code_llm(
+                benchmark="humaneval",
+                mutation_strategy="react",
+                policy_mode="random_choice",
+                use_llm_judge=True,
+                judge_model="same-backend",
+                selector_model="same-backend",
+                max_iterations=1,
+            )
+            solve = task.solver[0]
+            solved_state = await solve(state, generate_fn)
+
+        metadata = solved_state.metadata
+        attempt = metadata["all_attempts"][0]
+        selector_output = attempt["trace"]["selector_output"]
+        self.assertEqual(metadata["benchmark"], "humaneval")
+        self.assertEqual(metadata["policy_mode"], "random_choice")
+        self.assertEqual(selector_output["policy_mode"], "random_choice")
+        self.assertEqual(selector_output["tactic_id"], "taxonomy_roleplay")
+        self.assertEqual(selector_output["tactic_family"], "roleplay")
+        self.assertEqual(attempt["selected_tactic_action"]["tactic_id"], "taxonomy_roleplay")
+        self.assertEqual(attempt["selected_tactic_action"]["tactic_family"], "roleplay")
+        self.assertTrue(sandbox.programs[1].startswith(attempt["executable_code"]))
+        self.assertIn("check(increment)", sandbox.programs[1])
+        self.assertEqual(metadata["prompt"], "Write increment.")
+        self.assertEqual(metadata["test"], "def check(candidate):\n    assert candidate(1) == 2\n")
+        self.assertEqual(metadata["entry_point"], "increment")
+        self.assertIn("baseline", metadata)
+        self.assertIn("all_attempts", metadata)
+
     def test_loader_returns_same_interface_shape_for_mbpp_and_humaneval(self):
         mbpp_state = DummyState(
             prompt="Write add_one.",
@@ -318,6 +385,19 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
     def test_loader_can_construct_mbpp_and_humaneval_tasks(self):
         self.assertIsNotNone(load_benchmark_task("mbpp", temperature=0.0))
         self.assertIsNotNone(load_benchmark_task("humaneval", temperature=0.0))
+
+    def test_humaneval_loader_falls_back_when_temperature_is_unsupported(self):
+        calls = []
+
+        def humaneval_without_temperature():
+            calls.append("called")
+            return SimpleNamespace(dataset=[], scorer=None)
+
+        with patch("utils.benchmark_loader.humaneval", humaneval_without_temperature):
+            task = load_benchmark_task("humaneval", temperature=0.3)
+
+        self.assertIsNotNone(task)
+        self.assertEqual(calls, ["called"])
 
     async def test_real_test_result_comes_from_execution(self):
         sandbox = FakeSandbox()

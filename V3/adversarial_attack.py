@@ -163,6 +163,7 @@ def adversarial_code_llm(
         async def solve(state: TaskState, generate_fn):
             attempts = []
             original_messages = deepcopy(state.messages)
+            original_sample_metadata = deepcopy(getattr(state, "metadata", {}) or {})
             effective_max_iterations = (
                 1 if smoke_test or experiment_mode == "one_shot" else max_iterations
             )
@@ -641,9 +642,9 @@ def adversarial_code_llm(
                     target_model
                     or getattr(state, "model", None)
                     or getattr(state, "model_name", None)
-                    or state.metadata.get("target_model")
-                    or state.metadata.get("model")
-                    or state.metadata.get("model_name")
+                    or original_sample_metadata.get("target_model")
+                    or original_sample_metadata.get("model")
+                    or original_sample_metadata.get("model_name")
                     or os.getenv("MODEL")
                 )
                 effective_target_model = (
@@ -651,9 +652,26 @@ def adversarial_code_llm(
                     if effective_target_model is not None
                     else None
                 )
+                merged_metadata = {**original_sample_metadata, **metadata}
+                if benchmark_spec.benchmark_name == "humaneval":
+                    merged_metadata["prompt"] = (
+                        original_sample_metadata.get("prompt")
+                        or merged_metadata.get("prompt")
+                        or benchmark_spec.problem_text
+                    )
+                    merged_metadata["test"] = (
+                        original_sample_metadata.get("test")
+                        or merged_metadata.get("test")
+                        or benchmark_spec.test_harness
+                    )
+                    merged_metadata["entry_point"] = (
+                        original_sample_metadata.get("entry_point")
+                        or merged_metadata.get("entry_point")
+                        or benchmark_spec.entry_point
+                    )
                 persistence = persist_run_results(
                     results_dir=results_dir,
-                    metadata=metadata,
+                    metadata=merged_metadata,
                     task_name="adversarial_code_llm",
                     benchmark=benchmark_spec.benchmark_name,
                     policy_mode=policy_mode,
@@ -663,16 +681,16 @@ def adversarial_code_llm(
                     selector_model=selector_model if selector_model else judge_model,
                     max_iterations=max_iterations,
                     sample_id=(
-                        state.metadata.get("sample_id")
-                        or state.metadata.get("task_id")
-                        or state.metadata.get("id")
+                        original_sample_metadata.get("sample_id")
+                        or original_sample_metadata.get("task_id")
+                        or original_sample_metadata.get("id")
                     ),
                 )
-                metadata["run_id"] = persistence["run_id"]
-                metadata["results_path"] = persistence["run_path"]
-                metadata["run_config"] = persistence["run_config"]
-                metadata["run_summary"] = persistence["run_summary"]
-                return metadata
+                merged_metadata["run_id"] = persistence["run_id"]
+                merged_metadata["results_path"] = persistence["run_path"]
+                merged_metadata["run_config"] = persistence["run_config"]
+                merged_metadata["run_summary"] = persistence["run_summary"]
+                return merged_metadata
 
             # === BASELINE ===
             baseline_artifact_bundle = None

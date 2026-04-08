@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import inspect
 from typing import Any
 
 from inspect_evals.mbpp import mbpp
@@ -35,7 +36,20 @@ def load_benchmark_task(benchmark_name: str, *, temperature: float):
 
     if humaneval is None:
         raise ImportError("HumanEval benchmark is not available in this Inspect install.")
-    return humaneval(temperature=temperature)
+    try:
+        humaneval_signature = inspect.signature(humaneval)
+    except (TypeError, ValueError):
+        humaneval_signature = None
+
+    if humaneval_signature is not None and "temperature" in humaneval_signature.parameters:
+        return humaneval(temperature=temperature)
+
+    try:
+        return humaneval()
+    except TypeError as exc:
+        if "temperature" in str(exc):
+            return humaneval()
+        raise
 
 
 def extract_benchmark_spec(task_state, benchmark_name: str) -> BenchmarkSpec:

@@ -1,8 +1,8 @@
 {
-  "run_id": "2026-04-08_21-07-24_mbpp_agent_based_decision_ollama-qwen3.5-0.8b_c50e1e11",
-  "timestamp": "2026-04-08T21:07:24.451045+01:00",
-  "benchmark": "mbpp",
-  "policy_mode": "agent_based_decision",
+  "run_id": "2026-04-08_23-06-47_humaneval_random_choice_ollama-qwen3.5-0.8b_0ed592d6",
+  "timestamp": "2026-04-08T23:06:47.572578+01:00",
+  "benchmark": "humaneval",
+  "policy_mode": "random_choice",
   "experiment_mode": "iterative",
   "target_model": "ollama/qwen3.5:0.8b",
   "judge_model": "ollama/qwen3.5:0.8b",
