@@ -1,0 +1,16 @@
+{
+  "run_id": "2026-04-08_21-07-24_mbpp_agent_based_decision_ollama-qwen3.5-0.8b_c50e1e11",
+  "timestamp": "2026-04-08T21:07:24.451045+01:00",
+  "benchmark": "mbpp",
+  "policy_mode": "agent_based_decision",
+  "experiment_mode": "iterative",
+  "target_model": "ollama/qwen3.5:0.8b",
+  "judge_model": "ollama/qwen3.5:0.8b",
+  "selector_model": "ollama/qwen3.5:0.8b",
+  "max_iterations": 3,
+  "limit": null,
+  "max_samples": null,
+  "seed": null,
+  "task_name": "adversarial_code_llm",
+  "git_commit": null
+}

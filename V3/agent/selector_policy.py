@@ -57,7 +57,7 @@ class ReactSelectorPolicy:
         self._selector = ReactTacticSelector(selector_model, environment=environment)
 
     async def select(self, context: SelectorContext) -> SelectorDecision:
-        chosen: TacticRegistryEntry = await self._selector.select_tactic(
+        selection = await self._selector.select_tactic_with_reasoning(
             problem=context.problem,
             current_code=context.current_code,
             test_judge_decision=context.test_judge_decision,
@@ -68,6 +68,7 @@ class ReactSelectorPolicy:
             previous_attempts=context.previous_attempts,
             tool_decompose_output=context.tool_decompose_output,
         )
+        chosen: TacticRegistryEntry = selection.tactic
         return SelectorDecision(
             tactic_id=chosen.tactic_id,
             tactic_family=chosen.tactic_family,
@@ -75,7 +76,7 @@ class ReactSelectorPolicy:
             renderer_binding=chosen.renderer_binding,
             taxonomy_category=chosen.taxonomy_category,
             selector_name="agent_based_decision",
-            selector_reasoning=None,
+            selector_reasoning=selection.selector_reasoning,
         )
 
 

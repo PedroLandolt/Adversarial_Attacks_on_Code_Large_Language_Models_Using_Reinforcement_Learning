@@ -1,0 +1,16 @@
+{
+  "run_id": "2026-04-08_20-02-28_mbpp_agent_based_decision_same-backend_de7cbfe6",
+  "timestamp": "2026-04-08T20:02:28.750830+01:00",
+  "benchmark": "mbpp",
+  "policy_mode": "agent_based_decision",
+  "experiment_mode": "iterative",
+  "target_model": null,
+  "judge_model": "same-backend",
+  "selector_model": "same-backend",
+  "max_iterations": 1,
+  "limit": null,
+  "max_samples": null,
+  "seed": null,
+  "task_name": "adversarial_code_llm",
+  "git_commit": null
+}
