@@ -6,6 +6,13 @@ import json
 from pathlib import Path
 from uuid import uuid4
 
+from utils.reward_accounting import (
+    REWARD_RULE_VERSION,
+    compute_attempt_reward,
+    normalize_arm_id,
+    summarize_arm_accounting,
+)
+
 
 def _sanitize_model_tag(model_name: str | None) -> str:
     text = str(model_name or "unknown-model")
@@ -34,16 +41,6 @@ def _normalize_model_value(model_value) -> str | None:
     return str(model_value)
 
 
-def _compute_reward(record: dict, failure_stage: str | None) -> float:
-    if record.get("attack_success") is True:
-        return 1.0
-    if record.get("syntax_valid") is False:
-        return -1.0
-    if failure_stage in {"iteration_exception", "attack_application"}:
-        return -0.5
-    return 0.0
-
-
 def _extract_attempt_record(
     *,
     run_id: str,
@@ -59,7 +56,11 @@ def _extract_attempt_record(
     test_judge = record.get("test_judge") or {}
     trace_summary = ((record.get("trace") or {}).get("summary") or {})
     failure_stage = record.get("failure_stage") or trace_summary.get("failure_stage")
-    reward = _compute_reward(record, failure_stage)
+    arm_id = normalize_arm_id(
+        tactic_id=tactic_action.get("tactic_id") or selector_output.get("tactic_id"),
+        tactic_family=tactic_action.get("tactic_family") or selector_output.get("tactic_family"),
+    )
+    reward_info = compute_attempt_reward(record, failure_stage)
 
     return {
         "run_id": run_id,
@@ -69,6 +70,7 @@ def _extract_attempt_record(
         "experiment_mode": experiment_mode,
         "iteration": record.get("iteration"),
         "selected_tactic": record.get("selected_tactic") or record.get("tactic"),
+        "arm_id": arm_id,
         "tactic_id": tactic_action.get("tactic_id") or selector_output.get("tactic_id"),
         "tactic_family": tactic_action.get("tactic_family") or selector_output.get("tactic_family"),
         "test_judge_decision": test_judge.get("decision"),
@@ -77,7 +79,9 @@ def _extract_attempt_record(
         "attack_success": record.get("attack_success"),
         "syntax_valid": record.get("syntax_valid"),
         "failure_stage": failure_stage,
-        "reward": reward,
+        "reward": reward_info["reward"],
+        "reward_components": reward_info["reward_components"],
+        "reward_rule": reward_info["reward_rule"],
         "selector_reasoning": selector_output.get("selector_reasoning"),
         "stop_reason": record.get("stop_reason"),
         "raw_completion_summary": _artifact_summary(record.get("raw_completion")),
@@ -121,21 +125,11 @@ def _build_attempt_rows(metadata: dict, run_id: str, sample_id: str) -> list[dic
 
 
 def _compute_summary(metadata: dict, attempt_rows: list[dict], run_id: str) -> dict:
-    success_by_arm = Counter()
-    pulls_by_arm = Counter()
-    reward_values = defaultdict(list)
     stop_reason_counts = Counter()
     llm_confidences = []
+    arm_accounting = summarize_arm_accounting(attempt_rows)
 
     for row in attempt_rows:
-        tactic_family = row.get("tactic_family")
-        if tactic_family:
-            pulls_by_arm[tactic_family] += 1
-            if row.get("attack_success"):
-                success_by_arm[tactic_family] += 1
-            if row.get("reward") is not None:
-                reward_values[tactic_family].append(row["reward"])
-
         stop_reason = row.get("stop_reason")
         if stop_reason:
             stop_reason_counts[stop_reason] += 1
@@ -172,11 +166,11 @@ def _compute_summary(metadata: dict, attempt_rows: list[dict], run_id: str) -> d
         "average_llm_confidence": (
             sum(llm_confidences) / len(llm_confidences) if llm_confidences else None
         ),
-        "success_by_arm": dict(success_by_arm),
-        "pulls_by_arm": dict(pulls_by_arm),
-        "average_reward_by_arm": {
-            arm: (sum(values) / len(values)) for arm, values in reward_values.items()
-        },
+        "reward_rule": REWARD_RULE_VERSION,
+        "success_by_arm": arm_accounting["success_by_arm"],
+        "pulls_by_arm": arm_accounting["pulls_by_arm"],
+        "cumulative_reward_by_arm": arm_accounting["cumulative_reward_by_arm"],
+        "average_reward_by_arm": arm_accounting["average_reward_by_arm"],
         "stop_reason_counts": dict(stop_reason_counts),
     }
 

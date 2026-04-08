@@ -854,7 +854,25 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                 )
             )
             self.assertTrue(
+                all(
+                    "arm_id" in attempt
+                    and "reward_components" in attempt
+                    and "reward_rule" in attempt
+                    for run in loaded_runs
+                    for attempt in run["attempts"]
+                )
+            )
+            self.assertTrue(
                 all("average_reward_by_arm" in summary for summary in loaded_summaries)
+            )
+            self.assertTrue(
+                all("cumulative_reward_by_arm" in summary for summary in loaded_summaries)
+            )
+            self.assertTrue(
+                all("pulls_by_arm" in summary for summary in loaded_summaries)
+            )
+            self.assertTrue(
+                all("reward_rule" in summary for summary in loaded_summaries)
             )
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
