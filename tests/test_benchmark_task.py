@@ -324,6 +324,143 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("baseline", metadata)
         self.assertIn("all_attempts", metadata)
 
+    async def test_policy_modes_share_entrypoint_and_persist_comparable_outputs_with_rl_bandit(self):
+        temp_dir = Path.cwd() / ".tmp_test_results" / uuid4().hex
+        results_dir = str(temp_dir / "results")
+        try:
+            async def run_policy_mode(
+                *,
+                policy_mode: str,
+                max_iterations: int,
+                selector_patch=None,
+            ):
+                sandbox = FakeSandbox()
+                state = DummyState(
+                    prompt="Write increment.",
+                    test_list=["assert increment(1) == 3"],
+                    metadata={"test_list": ["assert increment(1) == 3"], "sample_id": f"{policy_mode}_sample"},
+                    target=["assert increment(1) == 3"],
+                )
+                generated = [
+                    "```python\ndef increment(x):\n    return x + 1\n```"
+                    for _ in range(max_iterations + 1)
+                ]
+                judge_decisions = [
+                    SimpleNamespace(decision="FAIL", confidence=0.2, reasoning="baseline fail", vulnerability="none")
+                ] + [
+                    SimpleNamespace(decision="FAIL", confidence=0.3, reasoning="iteration fail", vulnerability="none")
+                    for _ in range(max_iterations)
+                ]
+
+                async def generate_fn(_state):
+                    return FakeGenerateResponse(generated.pop(0))
+
+                patches = [
+                    patch.object(benchmark_module, "sandbox", return_value=sandbox),
+                    patch.object(
+                        benchmark_module,
+                        "validate_python_syntax",
+                        return_value={"syntax_valid": True, "syntax_error": None},
+                    ),
+                    patch.object(
+                        benchmark_module,
+                        "LLMJudge",
+                        lambda backend: FakeJudge(backend, decisions=list(judge_decisions)),
+                    ),
+                ]
+                if selector_patch is not None:
+                    patches.append(selector_patch)
+
+                with patches[0], patches[1], patches[2]:
+                    extra_context = patches[3] if len(patches) > 3 else None
+                    if extra_context:
+                        with extra_context:
+                            task = benchmark_module.adversarial_code_llm(
+                                benchmark="mbpp",
+                                mutation_strategy="react",
+                                policy_mode=policy_mode,
+                                experiment_mode="iterative",
+                                use_llm_judge=True,
+                                judge_model="same-backend",
+                                selector_model="same-backend",
+                                max_iterations=max_iterations,
+                                results_dir=results_dir,
+                            )
+                            return await task.solver[0](state, generate_fn)
+                    task = benchmark_module.adversarial_code_llm(
+                        benchmark="mbpp",
+                        mutation_strategy="react",
+                        policy_mode=policy_mode,
+                        experiment_mode="iterative",
+                        use_llm_judge=True,
+                        judge_model="same-backend",
+                        selector_model="same-backend",
+                        max_iterations=max_iterations,
+                        results_dir=results_dir,
+                    )
+                    return await task.solver[0](state, generate_fn)
+
+            random_state = await run_policy_mode(
+                policy_mode="random_choice",
+                max_iterations=1,
+                selector_patch=patch.object(
+                    benchmark_module,
+                    "RandomSelectorPolicy",
+                    FakeRandomSelectorPolicy,
+                ),
+            )
+            agent_state = await run_policy_mode(
+                policy_mode="agent_based_decision",
+                max_iterations=1,
+                selector_patch=patch.object(
+                    benchmark_module,
+                    "ReactSelectorPolicy",
+                    FakeSelectorPolicyWithReasoning,
+                ),
+            )
+            rl_state = await run_policy_mode(
+                policy_mode="rl_bandit",
+                max_iterations=2,
+            )
+
+            loaded_runs = load_persisted_runs(results_dir)
+            self.assertEqual(len(loaded_runs), 3)
+            self.assertEqual(
+                {run["run_config"]["policy_mode"] for run in loaded_runs},
+                {"random_choice", "agent_based_decision", "rl_bandit"},
+            )
+
+            rl_run = next(
+                run for run in loaded_runs if run["run_config"]["policy_mode"] == "rl_bandit"
+            )
+            self.assertEqual(rl_run["run_config"]["bandit_algorithm"], "ucb1")
+            self.assertEqual(rl_run["run_summary"]["bandit_algorithm"], "ucb1")
+            self.assertTrue(all("reward" in attempt for attempt in rl_run["attempts"]))
+            self.assertTrue(all("arm_id" in attempt for attempt in rl_run["attempts"]))
+            self.assertTrue(all(attempt["bandit_algorithm"] == "ucb1" for attempt in rl_run["attempts"][1:]))
+            self.assertTrue(all(attempt["bandit_state"] is not None for attempt in rl_run["attempts"][1:]))
+
+            rl_attempts = rl_state.metadata["all_attempts"]
+            self.assertEqual(rl_state.metadata["policy_mode"], "rl_bandit")
+            self.assertEqual(rl_state.metadata["bandit_algorithm"], "ucb1")
+            self.assertEqual(
+                rl_attempts[0]["trace"]["selector_output"]["bandit_algorithm"],
+                "ucb1",
+            )
+            self.assertEqual(
+                rl_attempts[0]["selected_tactic_action"]["tactic_id"],
+                "legacy_injection",
+            )
+            self.assertEqual(
+                rl_attempts[1]["selected_tactic_action"]["tactic_id"],
+                "legacy_output",
+            )
+
+            self.assertEqual(random_state.metadata["policy_mode"], "random_choice")
+            self.assertEqual(agent_state.metadata["policy_mode"], "agent_based_decision")
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
     def test_loader_returns_same_interface_shape_for_mbpp_and_humaneval(self):
         mbpp_state = DummyState(
             prompt="Write add_one.",

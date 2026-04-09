@@ -334,7 +334,7 @@ A meaningful lower-complexity baseline exists for conference comparisons.
 
 ---
 
-# [ ] TASK 8 — Define shared reward and arm accounting for bandit learning
+# [x] TASK 8 — Define shared reward and arm accounting for bandit learning
 
 ## Goal
 Prepare a clean RL-compatible contract before implementing the bandit policy.
@@ -368,7 +368,7 @@ Bandit learning and plotting can share the same accounting contract.
 
 ---
 
-# [ ] TASK 9 — Implement the first rl_bandit selector baseline
+# [x] TASK 9 — Implement the first rl_bandit selector baseline
 
 ## Goal
 Introduce the first RL-based selector for the conference paper.

@@ -82,6 +82,7 @@ from copy import deepcopy
 def adversarial_code_llm(
     benchmark: str = "mbpp",
     policy_mode: str = "agent_based_decision",
+    bandit_algorithm: str = "ucb1",
     experiment_mode: str = "iterative",
     temperature: float = 0.5,
     max_iterations: int = 5,
@@ -117,6 +118,8 @@ def adversarial_code_llm(
 
     if experiment_mode not in {"one_shot", "iterative"}:
         raise ValueError("experiment_mode must be one of: 'one_shot', 'iterative'.")
+    if policy_mode == "rl_bandit" and bandit_algorithm != "ucb1":
+        raise ValueError("policy_mode='rl_bandit' currently supports only bandit_algorithm='ucb1'.")
 
     base_task = load_benchmark_task(benchmark, temperature=temperature)
 
@@ -154,7 +157,10 @@ def adversarial_code_llm(
         elif policy_mode == "random_choice":
             selector_policy = RandomSelectorPolicy(environment="benchmark")
         elif policy_mode == "rl_bandit":
-            selector_policy = RLBanditSelectorPolicy(environment="benchmark")
+            selector_policy = RLBanditSelectorPolicy(
+                environment="benchmark",
+                bandit_algorithm=bandit_algorithm,
+            )
         else:
             raise ValueError(f"Unsupported policy_mode: {policy_mode}")
 
@@ -631,6 +637,9 @@ def adversarial_code_llm(
                     "judge_model": judge_model,
                     "selector_model": selector_model if selector_model else judge_model,
                     "policy_mode": policy_mode,
+                    "bandit_algorithm": (
+                        bandit_algorithm if policy_mode == "rl_bandit" else None
+                    ),
                     "timings": timings,
                     "llm_call_counts": llm_call_counts,
                     "use_llm_judge": use_llm_judge,
@@ -675,6 +684,9 @@ def adversarial_code_llm(
                     task_name="adversarial_code_llm",
                     benchmark=benchmark_spec.benchmark_name,
                     policy_mode=policy_mode,
+                    bandit_algorithm=(
+                        bandit_algorithm if policy_mode == "rl_bandit" else None
+                    ),
                     experiment_mode=experiment_mode,
                     target_model=effective_target_model,
                     judge_model=judge_model,
@@ -891,12 +903,22 @@ def adversarial_code_llm(
                             "selector_name",
                             policy_mode,
                         ),
+                        "bandit_algorithm": getattr(
+                            selector_decision,
+                            "bandit_algorithm",
+                            None,
+                        ),
+                        "bandit_state": getattr(
+                            selector_decision,
+                            "bandit_state",
+                            None,
+                        ),
                         "policy_mode": policy_mode,
                     }
                     selected_tactic_name = normalize_tactic_name(
                         selector_decision.tactic_family
                     )
-                    return selector_input, selector_output, selected_tactic_name
+                    return selector_input, selector_output, selected_tactic_name, selector_decision
 
                 async def apply_and_evaluate_tactic(
                     tactic_name: str,
@@ -1203,7 +1225,19 @@ def adversarial_code_llm(
                         "llm_vulnerability": llm_decision_obj.vulnerability,
                         "attack_success": attack_success,
                     })
-                
+
+                def apply_bandit_feedback(ctx: dict, attempt_record: dict) -> None:
+                    if policy_mode != "rl_bandit":
+                        return
+                    if selector_policy is None or not hasattr(selector_policy, "record_outcome"):
+                        return
+                    selector_decision = ctx.get("selector_decision")
+                    if selector_decision is None:
+                        return
+                    feedback = selector_policy.record_outcome(selector_decision, attempt_record)
+                    trace_selector_output = ((attempt_record.get("trace") or {}).get("selector_output") or {})
+                    trace_selector_output["bandit_feedback"] = feedback
+
                 # State tracking for feedback loop (per DATA_CONTRACT_ARCHITECTURE.md 7.2)
                 last_test_result = test_decision
                 last_llm_result = llm_decision
@@ -1224,6 +1258,7 @@ def adversarial_code_llm(
                             ctx["selector_input"],
                             ctx["selector_output"],
                             ctx["selected_tactic_name"],
+                            ctx["selector_decision"],
                         ) = await select_tactic_for_iteration(
                             iteration,
                             current_code,
@@ -1250,8 +1285,7 @@ def adversarial_code_llm(
                         ctx["attacked_code"] = ctx["artifact_bundle"]["review_artifact"]
                         if syntax_invalid:
                             ctx["failure_stage"] = "syntax_validation"
-                            attempts.append(
-                                build_react_attempt_record(
+                            syntax_attempt_record = build_react_attempt_record(
                                     iteration=iteration,
                                     selected_tactic_name=ctx["selected_tactic_name"],
                                     applied_tactic_name=ctx["applied_tactic_name"],
@@ -1277,7 +1311,8 @@ def adversarial_code_llm(
                                     error=ctx["artifact_bundle"]["syntax_result"]["syntax_error"],
                                     stop_reason="invalid_syntax",
                                 )
-                            )
+                            attempts.append(syntax_attempt_record)
+                            apply_bandit_feedback(ctx, syntax_attempt_record)
                             final_artifact_bundle = ctx["artifact_bundle"]
                             previous_tactics.append(ctx["applied_tactic_name"])
                             previous_attempts_history.append({
@@ -1305,6 +1340,7 @@ def adversarial_code_llm(
                             test_result_obj=test_result_iter,
                             attack_success=attack_succeeded,
                         )
+                        apply_bandit_feedback(ctx, attempts[-1])
                         final_artifact_bundle = ctx["artifact_bundle"]
 
                         # Record tactic only after successful application/evaluation.
@@ -1330,8 +1366,7 @@ def adversarial_code_llm(
                         error_text = error_text or f"{type(e).__name__} with empty message"
                         iteration_stop_reason = "iteration_error"
 
-                        attempts.append(
-                            build_react_attempt_record(
+                        iteration_error_record = build_react_attempt_record(
                                 iteration=iteration,
                                 selected_tactic_name=ctx["selected_tactic_name"],
                                 applied_tactic_name=ctx["applied_tactic_name"],
@@ -1363,7 +1398,8 @@ def adversarial_code_llm(
                                 error=error_text,
                                 stop_reason=iteration_stop_reason,
                             )
-                        )
+                        attempts.append(iteration_error_record)
+                        apply_bandit_feedback(ctx, iteration_error_record)
 
                 if stop_reason is None:
                     stop_reason = "max_iterations_reached"
