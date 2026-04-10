@@ -6,15 +6,41 @@ The default concrete policy wraps the existing ReactTacticSelector.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
 import math
 import random
-from typing import Protocol
-from typing import Any
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Protocol
 
 from agent.react_selector import ReactTacticSelector
 from agent.tactic_registry import TacticRegistryEntry, get_tactic_registry
 from utils.reward_accounting import compute_attempt_reward, normalize_arm_id
+
+
+def _save_bandit_weights(
+    path: str, pull_counts: dict, cumulative_rewards: dict
+) -> None:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(
+        json.dumps(
+            {"pull_counts": pull_counts, "cumulative_rewards": cumulative_rewards},
+            indent=2,
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _load_bandit_weights(path: str) -> dict | None:
+    p = Path(path)
+    if not p.exists():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, KeyError):
+        return None
 
 
 @dataclass(frozen=True)
@@ -111,16 +137,34 @@ class RLBanditSelectorPolicy:
         self,
         environment: str = "benchmark",
         bandit_algorithm: str = "ucb1",
+        weights_path: str | None = None,
+        freeze_weights: bool = False,
     ):
         if environment != "benchmark":
-            raise ValueError("RLBanditSelectorPolicy currently supports benchmark mode only.")
+            raise ValueError(
+                "RLBanditSelectorPolicy currently supports benchmark mode only."
+            )
         if bandit_algorithm != "ucb1":
-            raise ValueError("RLBanditSelectorPolicy currently supports only bandit_algorithm='ucb1'.")
+            raise ValueError(
+                "RLBanditSelectorPolicy currently supports only bandit_algorithm='ucb1'."
+            )
         self._environment = environment
         self._bandit_algorithm = bandit_algorithm
+        self._weights_path = weights_path
+        self._freeze_weights = freeze_weights
         self._actions = get_tactic_registry(environment)
         self._pull_counts = {entry.tactic_id: 0 for entry in self._actions}
         self._cumulative_rewards = {entry.tactic_id: 0.0 for entry in self._actions}
+
+        if weights_path is not None:
+            loaded = _load_bandit_weights(weights_path)
+            if loaded is not None:
+                for arm_id, count in loaded.get("pull_counts", {}).items():
+                    if arm_id in self._pull_counts:
+                        self._pull_counts[arm_id] = int(count)
+                for arm_id, reward in loaded.get("cumulative_rewards", {}).items():
+                    if arm_id in self._cumulative_rewards:
+                        self._cumulative_rewards[arm_id] = float(reward)
 
     async def select(self, context: SelectorContext) -> SelectorDecision:
         chosen = self._select_ucb1_action()
@@ -163,8 +207,13 @@ class RLBanditSelectorPolicy:
             attempt_record,
             attempt_record.get("failure_stage"),
         )
-        self._pull_counts[arm_id] += 1
-        self._cumulative_rewards[arm_id] += float(reward_info["reward"])
+        if not self._freeze_weights:
+            self._pull_counts[arm_id] += 1
+            self._cumulative_rewards[arm_id] += float(reward_info["reward"])
+            if self._weights_path is not None:
+                _save_bandit_weights(
+                    self._weights_path, self._pull_counts, self._cumulative_rewards
+                )
         return {
             "arm_id": arm_id,
             "reward": reward_info["reward"],
@@ -194,4 +243,6 @@ class RLBanditSelectorPolicy:
         pulls = self._pull_counts[tactic_id]
         if pulls == 0:
             return float("inf")
-        return self._average_reward(tactic_id) + math.sqrt((2.0 * math.log(total_pulls)) / pulls)
+        return self._average_reward(tactic_id) + math.sqrt(
+            (2.0 * math.log(total_pulls)) / pulls
+        )
