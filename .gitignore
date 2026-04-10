@@ -214,3 +214,5 @@ __marimo__/
 
 approve_message.txt
 .tmp_test_results
+/results
+/logs

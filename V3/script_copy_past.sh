@@ -1,3 +1,7 @@
+# NOTE: The evals conda env has a 'utils' package in site-packages that shadows
+# V3/utils. Always prepend V3 to PYTHONPATH when using that env, e.g.:
+#   PYTHONPATH=V3 conda run -n evals inspect eval ...
+
 # ----------------------------------------------------------
 # MBPP + random_choice
 # ----------------------------------------------------------
