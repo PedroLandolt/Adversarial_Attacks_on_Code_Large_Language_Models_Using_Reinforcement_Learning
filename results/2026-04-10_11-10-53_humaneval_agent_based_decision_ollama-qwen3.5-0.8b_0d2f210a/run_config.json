@@ -1,0 +1,17 @@
+{
+  "run_id": "2026-04-10_11-10-53_humaneval_agent_based_decision_ollama-qwen3.5-0.8b_0d2f210a",
+  "timestamp": "2026-04-10T11:10:53.280516+01:00",
+  "benchmark": "humaneval",
+  "policy_mode": "agent_based_decision",
+  "bandit_algorithm": null,
+  "experiment_mode": "iterative",
+  "target_model": "ollama/qwen3.5:0.8b",
+  "judge_model": "ollama/qwen3.5:0.8b",
+  "selector_model": "ollama/qwen3.5:0.8b",
+  "max_iterations": 12,
+  "limit": null,
+  "max_samples": null,
+  "seed": null,
+  "task_name": "adversarial_code_llm",
+  "git_commit": null
+}

@@ -1,0 +1,17 @@
+{
+  "run_id": "2026-04-10_14-35-38_humaneval_rl_bandit_ollama-qwen3.5-0.8b_4e61aeb2",
+  "timestamp": "2026-04-10T14:35:38.197455+01:00",
+  "benchmark": "humaneval",
+  "policy_mode": "rl_bandit",
+  "bandit_algorithm": "ucb1",
+  "experiment_mode": "iterative",
+  "target_model": "ollama/qwen3.5:0.8b",
+  "judge_model": "ollama/qwen3.5:0.8b",
+  "selector_model": "ollama/qwen3.5:0.8b",
+  "max_iterations": 12,
+  "limit": null,
+  "max_samples": null,
+  "seed": null,
+  "task_name": "adversarial_code_llm",
+  "git_commit": null
+}

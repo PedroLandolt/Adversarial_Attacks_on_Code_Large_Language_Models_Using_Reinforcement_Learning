@@ -1,0 +1,23 @@
+{
+  "run_id": "2026-04-10_01-40-10_humaneval_random_choice_ollama-qwen3.5-0.8b_d5b6fef7",
+  "benchmark": "humaneval",
+  "policy_mode": "random_choice",
+  "bandit_algorithm": null,
+  "experiment_mode": "iterative",
+  "num_samples": 1,
+  "attack_success_rate": 0.0,
+  "successful_samples": 0,
+  "failed_samples": 1,
+  "syntax_invalid_rate": 1.0,
+  "invalid_attempt_rate": 1.0,
+  "average_iterations_to_success": null,
+  "average_llm_confidence": null,
+  "reward_rule": "benchmark_v1",
+  "success_by_arm": {},
+  "pulls_by_arm": {},
+  "cumulative_reward_by_arm": {},
+  "average_reward_by_arm": {},
+  "stop_reason_counts": {
+    "baseline_invalid_syntax": 1
+  }
+}

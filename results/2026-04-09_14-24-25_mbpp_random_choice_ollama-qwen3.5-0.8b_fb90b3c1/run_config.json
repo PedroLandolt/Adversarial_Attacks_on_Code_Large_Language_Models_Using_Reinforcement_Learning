@@ -1,0 +1,17 @@
+{
+  "run_id": "2026-04-09_14-24-25_mbpp_random_choice_ollama-qwen3.5-0.8b_fb90b3c1",
+  "timestamp": "2026-04-09T14:24:25.593028+01:00",
+  "benchmark": "mbpp",
+  "policy_mode": "random_choice",
+  "bandit_algorithm": null,
+  "experiment_mode": "iterative",
+  "target_model": "ollama/qwen3.5:0.8b",
+  "judge_model": "ollama/qwen3.5:0.8b",
+  "selector_model": "ollama/qwen3.5:0.8b",
+  "max_iterations": 12,
+  "limit": null,
+  "max_samples": null,
+  "seed": null,
+  "task_name": "adversarial_code_llm",
+  "git_commit": null
+}
