@@ -577,7 +577,7 @@ Experiment visualization becomes cheap, reproducible, and paper-friendly.
 
 ---
 
-# [ ] TASK 14 — Add concise conference-facing documentation
+# [x] TASK 14 — Add concise conference-facing documentation
 
 ## Goal
 Leave the conference benchmark path easy to understand and defend.
