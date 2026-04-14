@@ -83,8 +83,17 @@ class SelectorPolicy(Protocol):
 class ReactSelectorPolicy:
     """Adapter that exposes ReactTacticSelector via SelectorPolicy interface."""
 
-    def __init__(self, selector_model: str | Any, environment: str = "benchmark"):
-        self._selector = ReactTacticSelector(selector_model, environment=environment)
+    def __init__(
+        self,
+        selector_model: str | Any,
+        environment: str = "benchmark",
+        use_chain_of_thought: bool = True,
+    ):
+        self._selector = ReactTacticSelector(
+            selector_model,
+            environment=environment,
+            use_chain_of_thought=use_chain_of_thought,
+        )
 
     async def select(self, context: SelectorContext) -> SelectorDecision:
         selection = await self._selector.select_tactic_with_reasoning(

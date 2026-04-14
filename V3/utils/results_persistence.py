@@ -47,6 +47,9 @@ def _extract_attempt_record(
     sample_id: str,
     benchmark: str,
     policy_mode: str,
+    experiment_split: str | None,
+    split_definition: str | None,
+    selector_cot_enabled: bool | None,
     experiment_mode: str,
     record: dict,
 ) -> dict:
@@ -67,6 +70,13 @@ def _extract_attempt_record(
         "sample_id": sample_id,
         "benchmark": benchmark,
         "policy_mode": policy_mode,
+        "experiment_split": experiment_split,
+        "split_definition": split_definition,
+        "selector_cot_enabled": (
+            selector_output.get("selector_cot_enabled")
+            if selector_output.get("selector_cot_enabled") is not None
+            else selector_cot_enabled
+        ),
         "experiment_mode": experiment_mode,
         "iteration": record.get("iteration"),
         "selected_tactic": record.get("selected_tactic") or record.get("tactic"),
@@ -95,6 +105,9 @@ def _extract_attempt_record(
 def _build_attempt_rows(metadata: dict, run_id: str, sample_id: str) -> list[dict]:
     benchmark = metadata.get("benchmark")
     policy_mode = metadata.get("policy_mode")
+    experiment_split = metadata.get("experiment_split")
+    split_definition = metadata.get("split_definition")
+    selector_cot_enabled = metadata.get("selector_cot_enabled")
     experiment_mode = metadata.get("experiment_mode")
     rows = []
 
@@ -106,6 +119,9 @@ def _build_attempt_rows(metadata: dict, run_id: str, sample_id: str) -> list[dic
                 sample_id=sample_id,
                 benchmark=benchmark,
                 policy_mode=policy_mode,
+                experiment_split=experiment_split,
+                split_definition=split_definition,
+                selector_cot_enabled=selector_cot_enabled,
                 experiment_mode=experiment_mode,
                 record=baseline,
             )
@@ -118,6 +134,9 @@ def _build_attempt_rows(metadata: dict, run_id: str, sample_id: str) -> list[dic
                 sample_id=sample_id,
                 benchmark=benchmark,
                 policy_mode=policy_mode,
+                experiment_split=experiment_split,
+                split_definition=split_definition,
+                selector_cot_enabled=selector_cot_enabled,
                 experiment_mode=experiment_mode,
                 record=attempt,
             )
@@ -153,7 +172,11 @@ def _compute_summary(metadata: dict, attempt_rows: list[dict], run_id: str) -> d
         "run_id": run_id,
         "benchmark": metadata.get("benchmark"),
         "policy_mode": metadata.get("policy_mode"),
+        "experiment_split": metadata.get("experiment_split"),
+        "split_definition": metadata.get("split_definition"),
         "bandit_algorithm": metadata.get("bandit_algorithm"),
+        "selector_cot_enabled": metadata.get("selector_cot_enabled"),
+        "bandit_freeze_weights_effective": metadata.get("bandit_freeze_weights_effective"),
         "experiment_mode": metadata.get("experiment_mode"),
         "num_samples": 1,
         "attack_success_rate": 1.0 if metadata.get("attack_succeeded") else 0.0,
@@ -185,7 +208,11 @@ def persist_run_results(
     task_name: str,
     benchmark: str,
     policy_mode: str,
+    experiment_split: str | None,
+    split_definition: str | None,
     bandit_algorithm: str | None,
+    selector_cot_enabled: bool | None,
+    bandit_freeze_weights_effective: bool | None,
     experiment_mode: str,
     target_model: str | None,
     judge_model: str | None,
@@ -216,7 +243,11 @@ def persist_run_results(
         "timestamp": timestamp.isoformat(),
         "benchmark": benchmark,
         "policy_mode": policy_mode,
+        "experiment_split": experiment_split,
+        "split_definition": split_definition,
         "bandit_algorithm": bandit_algorithm,
+        "selector_cot_enabled": selector_cot_enabled,
+        "bandit_freeze_weights_effective": bandit_freeze_weights_effective,
         "experiment_mode": experiment_mode,
         "target_model": target_model,
         "judge_model": judge_model,

@@ -1,5 +1,54 @@
 # Adversarial Attacks on Code LLMs using Reinforcement Learning
 
+> **Current benchmark path (authoritative for day-to-day usage)**
+>
+> The active implementation path is the conference benchmark track.
+> If an older section below conflicts with the current code, follow this block and the files under `V3/`.
+>
+> Active scope:
+>
+> 1. `MBPP` and `HumanEval` as controlled judge-attack benchmarks.
+> 2. Selector-policy comparison across:
+>    - `random_choice`
+>    - `agent_based_decision`
+>    - `rl_bandit`
+> 3. Offline persistence and plotting-ready outputs under `results/`.
+>
+> Current benchmark contract:
+>
+> - Success condition:
+>
+>   ```text
+>   Attack Success = (Test Judge = FAIL) AND (LLM Judge = PASS)
+>   ```
+>
+> - Deterministic tests are the ground truth.
+> - The LLM judge is the attack target.
+> - Benchmark artifacts are explicitly separated into:
+>   - `raw_completion`
+>   - `executable_code`
+>   - `review_artifact`
+>
+> Current supported benchmark controls:
+>
+> - `benchmark`: `mbpp`, `humaneval`
+> - `policy_mode`: `random_choice`, `agent_based_decision`, `rl_bandit`
+> - `experiment_mode`: `one_shot`, `iterative`
+> - `bandit_algorithm`: currently `ucb1`
+> - syntax gating with `tree-sitter`
+> - persisted outputs in `results/`
+>
+> Current `rl_bandit` extras:
+>
+> - `bandit_weights_path` to reuse/save weights
+> - `bandit_freeze_weights=True` to evaluate with fixed weights
+>
+> Not part of the current benchmark path:
+>
+> - Gitea is not part of the active conference execution path
+> - `V3/gitea/` remains protected environment code
+> - the current RL baseline is bandit-based, not SARSA/Q-learning
+
 > **Alignment update — final thesis plan**
 >
 > This document preserves earlier project notes, but from this point onward the project must be interpreted according to the final thesis plan below. Whenever an older section conflicts with this update, this update takes precedence.
@@ -368,37 +417,7 @@ V3/
 
 ## 11. Usage
 
-### Run ReAct Strategy (NEW)
-
-```bash
-inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen3.5:0.8b \
-  -T mutation_strategy=react \
-  -T use_llm_judge=True \
-  -T judge_model=ollama/qwen3.5:0.8b \
-  -T max_iterations=5 \
-  --limit 2
-```
-
-### Run Original Strategies
-
-```bash
-# Random heuristic mutations
-inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen3.5:0.8b \
-  -T mutation_strategy=random \
-  -T max_iterations=3 \
-  --limit 2
-
-# Sequential heuristic mutations
-inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen3.5:0.8b \
-  -T mutation_strategy=sequential \
-  -T max_iterations=3 \
-  --limit 2
-```
-
-### Conference Smoke Tests
+### Launcher Smoke Tests
 
 ```bash
 # MBPP smoke test through launcher
@@ -430,15 +449,146 @@ inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   --limit 1
 ```
 
+### Policy Mode Comparisons
+
+```bash
+# MBPP + random_choice
+inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen3.5:0.8b \
+  -T benchmark=mbpp \
+  -T mutation_strategy=react \
+  -T policy_mode=random_choice \
+  -T experiment_mode=iterative \
+  -T use_llm_judge=True \
+  -T judge_model=ollama/qwen3.5:0.8b \
+  -T selector_model=ollama/qwen3.5:0.8b \
+  -T max_iterations=12 \
+  --max-samples 5 \
+  --limit 5
+
+# MBPP + agent_based_decision
+inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen3.5:0.8b \
+  -T benchmark=mbpp \
+  -T mutation_strategy=react \
+  -T policy_mode=agent_based_decision \
+  -T experiment_mode=iterative \
+  -T use_llm_judge=True \
+  -T judge_model=ollama/qwen3.5:0.8b \
+  -T selector_model=ollama/qwen3.5:0.8b \
+  -T max_iterations=12 \
+  --max-samples 5 \
+  --limit 5
+
+# MBPP + rl_bandit
+inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen3.5:0.8b \
+  -T benchmark=mbpp \
+  -T mutation_strategy=react \
+  -T policy_mode=rl_bandit \
+  -T bandit_algorithm=ucb1 \
+  -T experiment_mode=iterative \
+  -T use_llm_judge=True \
+  -T judge_model=ollama/qwen3.5:0.8b \
+  -T selector_model=ollama/qwen3.5:0.8b \
+  -T max_iterations=12 \
+  --max-samples 5 \
+  --limit 5
+```
+
+### rl_bandit With Persistent Weights
+
+```bash
+# Train / update bandit weights
+inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen3.5:0.8b \
+  -T benchmark=mbpp \
+  -T mutation_strategy=react \
+  -T policy_mode=rl_bandit \
+  -T bandit_algorithm=ucb1 \
+  -T bandit_weights_path=weights/mbpp_ucb1.json \
+  -T experiment_mode=iterative \
+  -T use_llm_judge=True \
+  -T judge_model=ollama/qwen3.5:0.8b \
+  -T selector_model=ollama/qwen3.5:0.8b \
+  -T max_iterations=12 \
+  --max-samples 5 \
+  --limit 5
+
+# Evaluate with frozen weights
+inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen3.5:0.8b \
+  -T benchmark=mbpp \
+  -T mutation_strategy=react \
+  -T policy_mode=rl_bandit \
+  -T bandit_algorithm=ucb1 \
+  -T bandit_weights_path=weights/mbpp_ucb1.json \
+  -T bandit_freeze_weights=True \
+  -T experiment_mode=iterative \
+  -T use_llm_judge=True \
+  -T judge_model=ollama/qwen3.5:0.8b \
+  -T selector_model=ollama/qwen3.5:0.8b \
+  -T max_iterations=12 \
+  --max-samples 5 \
+  --limit 5
+```
+
+### Other Supported Modes
+
+```bash
+# one_shot mode
+inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen3.5:0.8b \
+  -T benchmark=mbpp \
+  -T mutation_strategy=react \
+  -T policy_mode=random_choice \
+  -T experiment_mode=one_shot \
+  -T use_llm_judge=True \
+  -T judge_model=ollama/qwen3.5:0.8b \
+  -T selector_model=ollama/qwen3.5:0.8b \
+  -T max_iterations=1 \
+  --max-samples 1 \
+  --limit 1
+
+# HumanEval + rl_bandit
+inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen3.5:0.8b \
+  -T benchmark=humaneval \
+  -T mutation_strategy=react \
+  -T policy_mode=rl_bandit \
+  -T bandit_algorithm=ucb1 \
+  -T experiment_mode=iterative \
+  -T use_llm_judge=True \
+  -T judge_model=ollama/qwen3.5:0.8b \
+  -T selector_model=ollama/qwen3.5:0.8b \
+  -T max_iterations=12 \
+  --max-samples 5 \
+  --limit 5
+```
+
 ### Run Full Test Suite
 
 ```bash
 bash V3/run.sh
 ```
 
-### Run ReAct Test
+### Copy/Paste Command Sheet
 
-Use the current local smoke-test command defined by `prompt.md` and the benchmark scripts available in the repo.
+For a fuller command matrix, including MBPP/HumanEval and `rl_bandit` training vs frozen-weight evaluation, see:
+
+- [V3/script_copy_past.sh](/c:/Users/cesar/Desktop/Landolt/Tese/Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning/V3/script_copy_past.sh)
+
+Current workflow convention for split-aware experiments:
+- keep dataset partitioning at the command/script level, not inside the benchmark core
+- label runs with:
+  - `-T experiment_split=train|validation|test`
+  - `-T split_definition=<benchmark:scheme:range>`
+- use `inspect eval --limit start-end` to make the selected subset explicit and reproducible
+- for MBPP, the current default paper workflow is `70 / 15 / 15` over 927 samples:
+  - train: `1-649`
+  - validation: `650-788`
+  - test: `789-927`
+- frozen evaluation runs should set `-T bandit_freeze_weights=True`
 
 
 ---
@@ -452,48 +602,50 @@ Use the current local smoke-test command defined by `prompt.md` and the benchmar
 
 ---
 
-## 13. Mandatory Work Tracks Overview
+## 13. Current Project State
 
-### Track A: MBPP / HumanEval Judge-Attack Benchmark
-- Heuristic mutations implemented ✅
-- Iterative loop with `max_iterations` parameter ✅
-- ASR measurement framework ✅
-- Docker sandbox integration ✅
+### Benchmark path
+- MBPP and HumanEval run through the same benchmark entrypoint
+- The benchmark preserves `raw_completion`, `executable_code`, and `review_artifact`
+- Deterministic execution remains the ground truth
+- `tree-sitter` blocks invalid syntax before deterministic execution
+- `one_shot` and `iterative` experiment modes are both supported
 
-### Track B: Gitea Reviewer-Approval Environment
-- LLM-as-judge integration ✅
-- 4 red-teaming tactics ✅
-- Judge susceptibility evaluation ✅
-- Test-based vs LLM-based comparison ✅
+### Selector / policy path
+- `random_choice` is available as the non-adaptive baseline
+- `agent_based_decision` is the LLM-led selector baseline
+- `rl_bandit` is implemented as the first RL baseline
+- The current bandit baseline uses `ucb1`
+- `rl_bandit` can optionally persist weights through `bandit_weights_path`
+- `rl_bandit` can optionally evaluate with frozen weights via `bandit_freeze_weights=True`
+- split-aware train/validation/test workflows are tracked via persisted run labels:
+  - `experiment_split`
+  - `split_definition`
 
-### Track C: RL-ready Selector / Policy Layer
-- Real bounded ReAct loop (`max_iterations`) ✅
-- Action → observation → reasoning → next action ✅
-- Judge feedback drives next action ✅
-- Dynamic tactic selection from closed enum ✅
-- Early stopping on attack success ✅
+### Offline analysis path
+- Runs persist structured artifacts under `results/`
+- `run_config.json`, `run_summary.json`, and `attempts.jsonl` are produced per run
+- reward and arm-level accounting are persisted for later plotting
 
-### Mandatory Track C: RL-based Selector / Policy Layer
-- After ReAct loop is stable ✅
-- After LLM selector is operational ✅
-- Multi-Armed Bandit policy (one arm per tactic)
-- Reward from attack success condition
+### Still outside the active benchmark path
+- Gitea is not part of the current conference benchmark workflow
+- broader RL methods beyond the first bandit baseline are not implemented yet
 
 ### Consolidated Experiments + Analysis
-- Compare heuristic vs learned strategies
-- Measure improvement in judge-attack success and tactic-selection quality
-- Analyze judge robustness and selector generalization across environments
-- Consolidate thesis results
+- Compare benchmark policy modes on MBPP and HumanEval
+- Measure judge-attack success and tactic-selection quality
+- Analyze syntax-invalid rate, reward by arm, and iterations to success
+- Consolidate benchmark results for offline plots and paper claims
 
 ---
 
 ## 14. Key Research Questions
 
-1. Can we fool the LLM judge? ✅ (Tested in Phase 2)
-2. Which tactic is most effective under looped selection? 🔄 (Data being collected)
-3. How often do Test Judge and LLM Judge disagree? ✅ (Measured)
-4. Does adaptive selection outperform static/random strategy? 🔄 (ReAct vs random comparison)
-5. Does RL improve tactic choice once the common selector contract is stable across benchmark and Gitea environments? ⏳
+1. Can we fool the LLM judge while deterministic tests still fail?
+2. Which tactics or arms are most effective on MBPP and HumanEval?
+3. How often do deterministic tests and the LLM judge disagree?
+4. Does adaptive selection outperform `random_choice` on the benchmark path?
+5. Does the first RL baseline (`rl_bandit` with `ucb1`) improve selector behavior over non-learning baselines?
 
 ---
 

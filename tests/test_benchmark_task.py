@@ -179,6 +179,30 @@ class FakeRandomSelectorPolicy:
         )
 
 
+class FakeReactSelectorPolicyWithCotToggle:
+    init_flags = []
+
+    def __init__(self, _backend, environment="benchmark", use_chain_of_thought=True):
+        self.environment = environment
+        self.use_chain_of_thought = use_chain_of_thought
+        FakeReactSelectorPolicyWithCotToggle.init_flags.append(bool(use_chain_of_thought))
+
+    async def select(self, context):
+        return SimpleNamespace(
+            tactic_id="legacy_injection",
+            tactic_family="injection",
+            environment_support=("benchmark",),
+            renderer_binding="prompt_injection",
+            taxonomy_category="structural_logic",
+            selector_name="agent_based_decision",
+            selector_reasoning=(
+                "Use injection after judge resistance."
+                if self.use_chain_of_thought
+                else None
+            ),
+        )
+
+
 class FakeJudge:
     def __init__(self, _backend, decisions=None, seen_codes=None):
         self._decisions = decisions or []
@@ -201,6 +225,46 @@ class FakeModelName:
 
     def __str__(self) -> str:
         return self.value
+
+
+class FakeBanditSelectorPolicy:
+    init_calls = []
+
+    def __init__(
+        self,
+        environment="benchmark",
+        bandit_algorithm="ucb1",
+        weights_path=None,
+        freeze_weights=False,
+    ):
+        FakeBanditSelectorPolicy.init_calls.append(
+            {
+                "environment": environment,
+                "bandit_algorithm": bandit_algorithm,
+                "weights_path": weights_path,
+                "freeze_weights": freeze_weights,
+            }
+        )
+
+    async def select(self, context):
+        return SimpleNamespace(
+            tactic_id="legacy_injection",
+            tactic_family="injection",
+            environment_support=("benchmark",),
+            renderer_binding="prompt_injection",
+            taxonomy_category="structural_logic",
+            selector_name="rl_bandit",
+            selector_reasoning=None,
+            bandit_algorithm="ucb1",
+            bandit_state={"algorithm": "ucb1", "total_pulls": 0},
+        )
+
+    def record_outcome(self, decision, attempt_record):
+        return {
+            "arm_id": "legacy_injection",
+            "reward": 0.0,
+            "reward_rule": "benchmark_v1",
+        }
 
 
 class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
@@ -458,6 +522,222 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(random_state.metadata["policy_mode"], "random_choice")
             self.assertEqual(agent_state.metadata["policy_mode"], "agent_based_decision")
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    async def test_agent_based_decision_can_toggle_selector_cot_and_persist_it(self):
+        temp_dir = Path.cwd() / ".tmp_test_results" / uuid4().hex
+        results_dir = str(temp_dir / "results")
+        try:
+            FakeReactSelectorPolicyWithCotToggle.init_flags = []
+
+            async def run_with_cot(enabled: bool):
+                sandbox = FakeSandbox()
+                judge_decisions = [
+                    SimpleNamespace(decision="FAIL", confidence=0.2, reasoning="baseline fail", vulnerability="none"),
+                    SimpleNamespace(decision="FAIL", confidence=0.3, reasoning="iteration fail", vulnerability="none"),
+                ]
+                state = DummyState(
+                    prompt="Write increment.",
+                    test_list=["assert increment(1) == 3"],
+                    metadata={"test_list": ["assert increment(1) == 3"], "sample_id": f"cot_{enabled}"},
+                    target=["assert increment(1) == 3"],
+                )
+                generated = [
+                    "```python\ndef increment(x):\n    return x + 1\n```",
+                    "```python\ndef increment(x):\n    return x + 1\n```",
+                ]
+
+                async def generate_fn(_state):
+                    return FakeGenerateResponse(generated.pop(0))
+
+                with (
+                    patch.object(benchmark_module, "sandbox", return_value=sandbox),
+                    patch.object(
+                        benchmark_module,
+                        "validate_python_syntax",
+                        return_value={"syntax_valid": True, "syntax_error": None},
+                    ),
+                    patch.object(
+                        benchmark_module,
+                        "ReactSelectorPolicy",
+                        FakeReactSelectorPolicyWithCotToggle,
+                    ),
+                    patch.object(
+                        benchmark_module,
+                        "LLMJudge",
+                        lambda backend: FakeJudge(backend, decisions=list(judge_decisions)),
+                    ),
+                ):
+                    task = benchmark_module.adversarial_code_llm(
+                        benchmark="mbpp",
+                        mutation_strategy="react",
+                        policy_mode="agent_based_decision",
+                        selector_use_cot=enabled,
+                        experiment_mode="iterative",
+                        use_llm_judge=True,
+                        judge_model="same-backend",
+                        selector_model="same-backend",
+                        max_iterations=1,
+                        results_dir=results_dir,
+                    )
+                    return await task.solver[0](state, generate_fn)
+
+            cot_enabled_state = await run_with_cot(True)
+            cot_disabled_state = await run_with_cot(False)
+
+            self.assertEqual(FakeReactSelectorPolicyWithCotToggle.init_flags, [True, False])
+
+            enabled_attempt = cot_enabled_state.metadata["all_attempts"][0]
+            disabled_attempt = cot_disabled_state.metadata["all_attempts"][0]
+
+            self.assertTrue(cot_enabled_state.metadata["selector_cot_enabled"])
+            self.assertFalse(cot_disabled_state.metadata["selector_cot_enabled"])
+            self.assertTrue(enabled_attempt["trace"]["selector_output"]["selector_cot_enabled"])
+            self.assertFalse(disabled_attempt["trace"]["selector_output"]["selector_cot_enabled"])
+            self.assertEqual(
+                enabled_attempt["trace"]["selector_output"]["selector_reasoning"],
+                "Use injection after judge resistance.",
+            )
+            self.assertIsNone(disabled_attempt["trace"]["selector_output"]["selector_reasoning"])
+
+            loaded_runs = load_persisted_runs(results_dir)
+            self.assertEqual(len(loaded_runs), 2)
+            persisted_by_cot = {
+                run["run_config"]["selector_cot_enabled"]: run
+                for run in loaded_runs
+            }
+            self.assertIn(True, persisted_by_cot)
+            self.assertIn(False, persisted_by_cot)
+            self.assertTrue(persisted_by_cot[True]["run_summary"]["selector_cot_enabled"])
+            self.assertFalse(persisted_by_cot[False]["run_summary"]["selector_cot_enabled"])
+            self.assertTrue(
+                all(
+                    attempt["selector_cot_enabled"] is True
+                    for attempt in persisted_by_cot[True]["attempts"]
+                )
+            )
+            self.assertTrue(
+                all(
+                    attempt["selector_cot_enabled"] is False
+                    for attempt in persisted_by_cot[False]["attempts"]
+                )
+            )
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def test_experiment_split_label_does_not_slice_benchmark_dataset(self):
+        class Sample:
+            def __init__(self, sample_id):
+                self.metadata = {"sample_id": sample_id}
+
+        dataset = [Sample(f"sample_{index}") for index in range(60)]
+
+        with patch.object(
+            benchmark_module,
+            "load_benchmark_task",
+            return_value=SimpleNamespace(dataset=dataset, scorer=None),
+        ):
+            train_task = benchmark_module.adversarial_code_llm(
+                benchmark="mbpp",
+                experiment_split="train",
+                split_definition="mbpp:70_15_15:1-42",
+                mutation_strategy="disabled",
+                use_llm_judge=False,
+            )
+            test_task = benchmark_module.adversarial_code_llm(
+                benchmark="mbpp",
+                experiment_split="test",
+                split_definition="mbpp:70_15_15:43-60",
+                mutation_strategy="disabled",
+                use_llm_judge=False,
+            )
+
+        self.assertEqual(len(train_task.dataset), len(dataset))
+        self.assertEqual(len(test_task.dataset), len(dataset))
+        self.assertEqual(train_task.dataset, dataset)
+        self.assertEqual(test_task.dataset, dataset)
+
+    async def test_rl_bandit_experiment_split_is_persisted_with_explicit_freeze(self):
+        temp_dir = Path.cwd() / ".tmp_test_results" / uuid4().hex
+        results_dir = str(temp_dir / "results")
+        try:
+            FakeBanditSelectorPolicy.init_calls = []
+            sandbox = FakeSandbox()
+            judge_decisions = [
+                SimpleNamespace(decision="FAIL", confidence=0.2, reasoning="baseline fail", vulnerability="none"),
+                SimpleNamespace(decision="FAIL", confidence=0.3, reasoning="iteration fail", vulnerability="none"),
+            ]
+            state = DummyState(
+                prompt="Write increment.",
+                test_list=["assert increment(1) == 3"],
+                metadata={"test_list": ["assert increment(1) == 3"], "sample_id": "split_test_sample"},
+                target=["assert increment(1) == 3"],
+            )
+            generated = [
+                "```python\ndef increment(x):\n    return x + 1\n```",
+                "```python\ndef increment(x):\n    return x + 1\n```",
+            ]
+
+            async def generate_fn(_state):
+                return FakeGenerateResponse(generated.pop(0))
+
+            with (
+                patch.object(benchmark_module, "sandbox", return_value=sandbox),
+                patch.object(
+                    benchmark_module,
+                    "validate_python_syntax",
+                    return_value={"syntax_valid": True, "syntax_error": None},
+                ),
+                patch.object(
+                    benchmark_module,
+                    "RLBanditSelectorPolicy",
+                    FakeBanditSelectorPolicy,
+                ),
+                patch.object(
+                    benchmark_module,
+                    "LLMJudge",
+                    lambda backend: FakeJudge(backend, decisions=list(judge_decisions)),
+                ),
+                ):
+                task = benchmark_module.adversarial_code_llm(
+                    benchmark="mbpp",
+                    experiment_split="test",
+                    split_definition="mbpp:70_15_15:789-927",
+                    mutation_strategy="react",
+                    policy_mode="rl_bandit",
+                    bandit_algorithm="ucb1",
+                    bandit_weights_path="weights/mbpp_ucb1.json",
+                    bandit_freeze_weights=True,
+                    use_llm_judge=True,
+                    judge_model="same-backend",
+                    selector_model="same-backend",
+                    max_iterations=1,
+                    results_dir=results_dir,
+                )
+                solved_state = await task.solver[0](state, generate_fn)
+
+            self.assertEqual(len(FakeBanditSelectorPolicy.init_calls), 1)
+            init_call = FakeBanditSelectorPolicy.init_calls[0]
+            self.assertTrue(init_call["freeze_weights"])
+            self.assertEqual(init_call["weights_path"], "weights/mbpp_ucb1.json")
+
+            metadata = solved_state.metadata
+            self.assertEqual(metadata["experiment_split"], "test")
+            self.assertEqual(metadata["split_definition"], "mbpp:70_15_15:789-927")
+            self.assertTrue(metadata["bandit_freeze_weights_effective"])
+
+            loaded_runs = load_persisted_runs(results_dir)
+            self.assertEqual(len(loaded_runs), 1)
+            run = loaded_runs[0]
+            self.assertEqual(run["run_config"]["experiment_split"], "test")
+            self.assertEqual(run["run_config"]["split_definition"], "mbpp:70_15_15:789-927")
+            self.assertTrue(run["run_config"]["bandit_freeze_weights_effective"])
+            self.assertEqual(run["run_summary"]["experiment_split"], "test")
+            self.assertEqual(run["run_summary"]["split_definition"], "mbpp:70_15_15:789-927")
+            self.assertTrue(run["run_summary"]["bandit_freeze_weights_effective"])
+            self.assertTrue(all(attempt["experiment_split"] == "test" for attempt in run["attempts"]))
+            self.assertTrue(all(attempt["split_definition"] == "mbpp:70_15_15:789-927" for attempt in run["attempts"]))
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 

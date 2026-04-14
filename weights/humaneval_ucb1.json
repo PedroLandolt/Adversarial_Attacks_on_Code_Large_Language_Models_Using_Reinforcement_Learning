@@ -12,7 +12,7 @@
   },
   "cumulative_rewards": {
     "legacy_injection": 0.0,
-    "legacy_output": 0.0,
+    "legacy_output": 1.0,
     "legacy_semantic": 0.0,
     "legacy_cot": 0.0,
     "taxonomy_roleplay": 0.0,

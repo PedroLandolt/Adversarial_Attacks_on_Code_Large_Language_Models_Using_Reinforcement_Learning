@@ -24,11 +24,17 @@ Build a clean experimental pipeline for **adversarial attacks on Code LLMs using
   - `random_choice`
   - `agent_based_decision`
   - `rl_bandit`
+- the selector can optionally run with **chain-of-thought enabled or disabled** when that mode is applicable,
 - syntactically invalid generated code is detected early using **tree-sitter**,
 - runs persist structured results to disk for **offline plotting**,
+- `rl_bandit` can optionally persist and reuse weights across runs,
 - experiments support both:
   - **one-shot** mode,
   - **iterative** mode,
+- experiments use explicit split conventions for:
+  - `train`
+  - `validation`
+  - `test`
 - final outputs are easy to compare and visualize for the paper.
 
 ---
@@ -63,19 +69,41 @@ Do not change this success condition in this plan.
 
 ---
 
-## Immediate priorities
+## New methodological decisions from the advisor meeting
 
-The conference path should be implemented in this order:
+These decisions now shape the remaining conference work:
 
-1. normalize model configuration for the conference default model,
-2. formalize selector policy modes,
-3. add tree-sitter syntax gating,
-4. add one-shot vs iterative experiment modes,
-5. persist run outputs to disk for offline analysis,
-6. implement random baseline through the shared selector contract,
-7. implement first bandit baseline,
-8. add plots and experiment summaries,
-9. document literature-informed bandit choice.
+1. **Selector CoT should be configurable**.
+   - Add an explicit boolean-style control for selector chain-of-thought usage.
+   - This applies only to selector modes where CoT is meaningful.
+   - `random_choice` should remain reasoning-free.
+
+2. **Evaluation should become split-aware**.
+   - The experiment workflow should support `train`, `validation`, and `test` splits.
+   - `rl_bandit` should:
+     - learn weights on `train`,
+     - use `validation` for configuration/model-selection decisions when needed,
+     - report final held-out results on `test` with frozen weights.
+
+3. **Split ratios must be justified, not guessed**.
+   - Candidate defaults to consider:
+     - `70 / 15 / 15`
+     - `80 / 10 / 10`
+   - A simple `80 / 20` train/test split is acceptable only if the methodology does not require a separate validation stage.
+   - The final paper-facing recommendation should be supported by the literature-review task.
+
+---
+
+## Remaining priorities
+
+The remaining conference path should now be implemented in this order:
+
+1. add selector CoT toggle,
+2. add explicit `train / validation / test` experiment workflow support,
+3. aggregate comparable benchmark summaries across policy modes and benchmarks,
+4. add plotting over persisted multi-run results,
+5. document the conference path cleanly,
+6. justify bandit choice and split strategy with literature.
 
 ---
 
@@ -402,7 +430,77 @@ The conference benchmark has an actual RL selector baseline instead of only a pl
 
 ---
 
-# [ ] TASK 10 — Compare policy modes on MBPP and HumanEval
+# [x] TASK 10 — Add optional selector CoT toggle
+
+## Goal
+Make selector reasoning style configurable for the conference experiments.
+
+## Required changes
+- Add an explicit benchmark-facing argument that enables or disables chain-of-thought for the selector when applicable.
+- Keep this toggle scoped to selector modes where CoT is meaningful.
+- `random_choice` must remain reasoning-free.
+- The selected CoT setting must be recorded in metadata and persisted outputs.
+- Support both:
+  - `one_shot`
+  - `iterative`
+
+## Delivery
+A selector-CoT control that is explicit in config, metadata, and persisted results.
+
+## Validate
+Show one benchmark run with:
+- selector CoT enabled
+- selector CoT disabled
+
+under the same benchmark task entrypoint.
+
+## Expected result
+The project can compare selector behavior with and without CoT instead of treating reasoning style as hidden prompt behavior.
+
+## Do not
+- do not add CoT to `random_choice`,
+- do not change benchmark success semantics.
+
+---
+
+# [x] TASK 11 — Define train/validation/test experiment workflow
+
+## Goal
+Make training and evaluation methodology defensible for the paper without overcomplicating the benchmark core.
+
+## Required changes
+- Define an explicit experiment workflow for:
+  - `train`
+  - `validation`
+  - `test`
+- Keep this primarily at the orchestration / script / command level unless a smaller benchmark-facing label is truly needed.
+- Decide and document the default split counts or percentages for MBPP and HumanEval.
+- Ensure `rl_bandit` can:
+  - learn weights on `train`,
+  - use `validation` for configuration/model-selection decisions when needed,
+  - run `test` with frozen weights.
+- Make the chosen split visible in persisted outputs, whether that comes from a lightweight argument or from orchestration metadata.
+- Keep the workflow reproducible and inspectable.
+
+## Delivery
+A simple and explicit experiment workflow that separates learning, validation, and final reporting.
+
+## Validate
+Show controlled commands or runs demonstrating:
+- one `train` run that updates bandit weights,
+- one `validation` or `test` run that uses frozen weights,
+- persisted metadata or run labeling that clearly records the chosen split.
+
+## Expected result
+The project can distinguish training-time runs from held-out evaluation runs without hiding the split only in memory or oral convention.
+
+## Do not
+- do not silently overlap train and test samples,
+- do not force a heavy benchmark-core refactor if scripts/orchestration are sufficient.
+
+---
+
+# [x] TASK 12 — Compare policy modes on MBPP and HumanEval with stable aggregation
 
 ## Goal
 Produce the first paper-ready comparison across benchmark and selector modes.
@@ -416,19 +514,27 @@ Produce the first paper-ready comparison across benchmark and selector modes.
   - MBPP
   - HumanEval
 - Keep outputs comparable while preserving benchmark-specific details.
-- Aggregate results into stable summary artifacts.
+- Aggregate multiple persisted runs into stable summary artifacts.
+- Preserve enough detail to compare:
+  - benchmark
+  - policy mode
+  - experiment mode
+  - split
+  - bandit setting when relevant
+- Make it possible to inspect performance evolution across runs over time.
 
 ## Delivery
 A benchmark comparison layer that supports paper claims with persisted experimental evidence.
 
 ## Validate
 Show comparable summaries for at least:
-- one MBPP run,
-- one HumanEval run,
-- each under multiple policy modes.
+- one MBPP run set,
+- one HumanEval run set,
+- each under multiple policy modes,
+- with aggregation over multiple stored runs.
 
 ## Expected result
-The project can compare policy behavior across the two benchmark environments without rerunning ad hoc scripts.
+The project can compare policy behavior across benchmarks and over time without rerunning ad hoc scripts.
 
 ## Do not
 - do not collapse everything into one misleading score,
@@ -436,7 +542,7 @@ The project can compare policy behavior across the two benchmark environments wi
 
 ---
 
-# [ ] TASK 11 — Add plotting pipeline over persisted results
+# [ ] TASK 13 — Add plotting pipeline over persisted results
 
 ## Goal
 Generate conference-ready figures without rerunning experiments.
@@ -451,7 +557,9 @@ Generate conference-ready figures without rerunning experiments.
   - arm preference over time,
   - one-shot vs iterative comparison,
   - syntax-invalid rate,
-  - iterations-to-success distribution.
+  - iterations-to-success distribution,
+  - train vs validation vs test comparison when split labels or metadata are available,
+  - `rl_bandit` evolution across runs when weights are reused.
 - Keep plotting independent from live benchmark execution.
 
 ## Delivery
@@ -469,7 +577,7 @@ Experiment visualization becomes cheap, reproducible, and paper-friendly.
 
 ---
 
-# [ ] TASK 12 — Add concise conference-facing documentation
+# [ ] TASK 14 — Add concise conference-facing documentation
 
 ## Goal
 Leave the conference benchmark path easy to understand and defend.
@@ -481,9 +589,11 @@ Leave the conference benchmark path easy to understand and defend.
   2. artifact flow,
   3. syntax gate,
   4. selector policy modes,
-  5. one-shot vs iterative modes,
-  6. persisted outputs,
-  7. plotting workflow.
+  5. selector CoT toggle,
+  6. one-shot vs iterative modes,
+  7. train/validation/test workflow,
+  8. persisted outputs,
+  9. plotting workflow.
 - Keep the thesis title unchanged in wording.
 
 ## Delivery
@@ -493,6 +603,7 @@ A short conference-facing markdown note, not a long architecture rewrite.
 A new contributor should be able to answer:
 - what is being measured,
 - which policies are compared,
+- how train/validation/test are used,
 - how results are saved,
 - how plots are regenerated.
 
@@ -505,30 +616,37 @@ The project becomes easier to run, analyze, and present before the paper deadlin
 
 ---
 
-# [ ] TASK 13 — Review literature and justify bandit choice for the paper
+# [ ] TASK 15 — Review literature and justify bandit choice and split strategy
 
 ## Goal
-Support the RL design choice with a small and focused literature-backed justification.
+Support the RL design choice and evaluation methodology with a small and focused literature-backed justification.
 
 ## Required changes
 - Review recent literature relevant to:
   - multi-armed bandits,
   - bandit-style exploration for LLM/prompt/action selection,
-  - simple alternatives that may outperform naive bandits in this setting.
+  - simple alternatives that may outperform naive bandits in this setting,
+  - train/validation/test methodology for adaptive learning systems.
 - Summarize why the selected baseline is appropriate for the conference timeline.
+- Summarize why the chosen split strategy is appropriate now.
+- Consider at least:
+  - `70 / 15 / 15`
+  - `80 / 10 / 10`
+  - and, if still defensible, a simpler `80 / 20` setup without separate validation.
 - Keep this as a focused justification note, not a giant literature review.
 
 ## Delivery
-A short markdown note that explains why the chosen bandit method is suitable now.
+A short markdown note that explains why the chosen bandit method and split strategy are suitable now.
 
 ## Validate
 The note should make it clear:
 - what alternatives were considered,
 - why the chosen method fits the current experimental setting,
+- why the chosen split strategy is defensible,
 - what is intentionally postponed.
 
 ## Expected result
-The paper can justify the initial RL selector choice without overclaiming.
+The paper can justify both the initial RL selector choice and the evaluation split strategy without overclaiming.
 
 ## Do not
 - do not expand this into a full thesis literature chapter,
@@ -545,9 +663,12 @@ This plan is complete only when all of the following are true:
   - `random_choice`
   - `agent_based_decision`
   - `rl_bandit`
+- Selector CoT can be enabled or disabled where applicable.
 - Syntax-invalid artifacts are detected and recorded before deterministic execution.
 - The benchmark supports both `one_shot` and `iterative` modes.
+- The project supports explicit `train`, `validation`, and `test` evaluation flows.
 - Runs persist structured outputs to disk.
+- Comparable summaries can be aggregated across multiple stored runs.
 - Plots can be regenerated offline from saved results.
 - The conference path is benchmark-only and does not depend on Gitea.
 - The thesis title remains unchanged.

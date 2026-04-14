@@ -76,6 +76,9 @@ def adversarial_code_llm(
     benchmark: str = "mbpp",
     policy_mode: str = "agent_based_decision",
     bandit_algorithm: str = "ucb1",
+    selector_use_cot: bool = True,
+    experiment_split: str = "full",
+    split_definition: str | None = None,
     experiment_mode: str = "iterative",
     temperature: float = 0.5,
     max_iterations: int = 5,
@@ -107,18 +110,26 @@ def adversarial_code_llm(
     - "one_shot": single adversarial attempt after baseline
     - "iterative": adaptive loop up to max_iterations
 
+    selector_use_cot controls whether the selector prompt asks for short chain-of-thought style reasoning
+    when that policy mode supports it.
+
     debug_force_invalid_syntax is for internal validation/regression checks only.
     It is not part of the normal benchmark experiment path.
     """
 
     if experiment_mode not in {"one_shot", "iterative"}:
         raise ValueError("experiment_mode must be one of: 'one_shot', 'iterative'.")
+    if experiment_split not in {"full", "train", "validation", "test"}:
+        raise ValueError(
+            "experiment_split must be one of: 'full', 'train', 'validation', 'test'."
+        )
     if policy_mode == "rl_bandit" and bandit_algorithm != "ucb1":
         raise ValueError(
             "policy_mode='rl_bandit' currently supports only bandit_algorithm='ucb1'."
         )
 
     base_task = load_benchmark_task(benchmark, temperature=temperature)
+    effective_bandit_freeze_weights = bool(bandit_freeze_weights)
 
     # Heuristic mutators (for random/sequential strategies)
     mutators = []
@@ -148,9 +159,17 @@ def adversarial_code_llm(
     selector_policy = None
     if mutation_strategy == "react" and use_llm_judge:
         if policy_mode == "agent_based_decision":
-            selector_policy = ReactSelectorPolicy(
-                shared_judge_selector_model or selector_backend
-            )
+            try:
+                selector_policy = ReactSelectorPolicy(
+                    shared_judge_selector_model or selector_backend,
+                    use_chain_of_thought=selector_use_cot,
+                )
+            except TypeError:
+                # Backward-compatible fallback for lightweight test doubles or
+                # older call sites that do not yet accept the CoT toggle.
+                selector_policy = ReactSelectorPolicy(
+                    shared_judge_selector_model or selector_backend
+                )
         elif policy_mode == "random_choice":
             selector_policy = RandomSelectorPolicy(environment="benchmark")
         elif policy_mode == "rl_bandit":
@@ -158,7 +177,7 @@ def adversarial_code_llm(
                 environment="benchmark",
                 bandit_algorithm=bandit_algorithm,
                 weights_path=bandit_weights_path,
-                freeze_weights=bandit_freeze_weights,
+                freeze_weights=effective_bandit_freeze_weights,
             )
         else:
             raise ValueError(f"Unsupported policy_mode: {policy_mode}")
@@ -670,8 +689,20 @@ def adversarial_code_llm(
                     "judge_model": judge_model,
                     "selector_model": selector_model if selector_model else judge_model,
                     "policy_mode": policy_mode,
+                    "experiment_split": experiment_split,
+                    "split_definition": split_definition,
+                    "selector_cot_enabled": (
+                        bool(selector_use_cot)
+                        if policy_mode == "agent_based_decision"
+                        else False
+                    ),
                     "bandit_algorithm": (
                         bandit_algorithm if policy_mode == "rl_bandit" else None
+                    ),
+                    "bandit_freeze_weights_effective": (
+                        bool(effective_bandit_freeze_weights)
+                        if policy_mode == "rl_bandit"
+                        else None
                     ),
                     "timings": timings,
                     "llm_call_counts": llm_call_counts,
@@ -717,8 +748,20 @@ def adversarial_code_llm(
                     task_name="adversarial_code_llm",
                     benchmark=benchmark_spec.benchmark_name,
                     policy_mode=policy_mode,
+                    experiment_split=experiment_split,
+                    split_definition=split_definition,
                     bandit_algorithm=(
                         bandit_algorithm if policy_mode == "rl_bandit" else None
+                    ),
+                    selector_cot_enabled=(
+                        bool(selector_use_cot)
+                        if policy_mode == "agent_based_decision"
+                        else False
+                    ),
+                    bandit_freeze_weights_effective=(
+                        bool(effective_bandit_freeze_weights)
+                        if policy_mode == "rl_bandit"
+                        else None
                     ),
                     experiment_mode=experiment_mode,
                     target_model=effective_target_model,
@@ -939,6 +982,11 @@ def adversarial_code_llm(
                             selector_decision,
                             "selector_reasoning",
                             None,
+                        ),
+                        "selector_cot_enabled": (
+                            bool(selector_use_cot)
+                            if policy_mode == "agent_based_decision"
+                            else False
                         ),
                         "selector_name": getattr(
                             selector_decision,
