@@ -616,7 +616,7 @@ The project becomes easier to run, analyze, and present before the paper deadlin
 
 ---
 
-# [ ] TASK 15 — Review literature and justify bandit choice and split strategy
+# [x] TASK 15 — Review literature and justify bandit choice and split strategy
 
 ## Goal
 Support the RL design choice and evaluation methodology with a small and focused literature-backed justification.
