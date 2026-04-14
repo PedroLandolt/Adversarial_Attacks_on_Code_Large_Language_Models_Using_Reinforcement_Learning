@@ -577,6 +577,44 @@ print("Coverage check: OK")
 PY
 
 
+# ==========================================================
+# 10. Task 13 - plotting pipeline validation pack
+# ==========================================================
+#
+# Goal:
+# - generate figures from persisted runs only
+# - validate the offline plotting entrypoint
+# - keep the plotting workflow independent from benchmark execution
+
+# 10.1 Plotting unit tests (must pass)
+c:/Users/cesar/Desktop/Landolt/Tese/Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning/.venv/Scripts/python.exe -m unittest tests.test_plotting_pipeline -v
+
+
+# 10.2 Generate plots from the current persisted results
+c:/Users/cesar/Desktop/Landolt/Tese/Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning/.venv/Scripts/python.exe plot.py --results-dir results --output-dir plots/latest
+
+
+# 10.3 Validate plotting outputs exist
+c:/Users/cesar/Desktop/Landolt/Tese/Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning/.venv/Scripts/python.exe - <<'PY'
+import json
+from pathlib import Path
+
+manifest_path = Path("plots/latest/plot_manifest.json")
+data = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+print("Plot manifest run_count:", data.get("run_count"))
+print("Plot manifest plot_count:", data.get("plot_count"))
+print("Plot files:")
+for item in data.get("plots", []):
+    print(" -", item)
+
+if data.get("plot_count", 0) < 6:
+    raise SystemExit("Expected at least 6 plot files")
+
+print("Plot validation: OK")
+PY
+
+
 # 9.5 Validate evolution evidence (at least one group with >=2 runs)
 c:/Users/cesar/Desktop/Landolt/Tese/Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning/.venv/Scripts/python.exe - <<'PY'
 import json

@@ -542,7 +542,7 @@ The project can compare policy behavior across benchmarks and over time without 
 
 ---
 
-# [ ] TASK 13 — Add plotting pipeline over persisted results
+# [x] TASK 13 — Add plotting pipeline over persisted results
 
 ## Goal
 Generate conference-ready figures without rerunning experiments.

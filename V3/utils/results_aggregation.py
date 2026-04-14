@@ -114,9 +114,11 @@ def aggregate_persisted_runs(
                 "average_llm_confidence": _safe_float(run_summary.get("average_llm_confidence")),
                 "successful_samples": run_summary.get("successful_samples"),
                 "failed_samples": run_summary.get("failed_samples"),
-                "stop_reason_counts": run_summary.get("stop_reason_counts") or {},
+                "success_by_arm": run_summary.get("success_by_arm") or {},
                 "pulls_by_arm": run_summary.get("pulls_by_arm") or {},
+                "cumulative_reward_by_arm": run_summary.get("cumulative_reward_by_arm") or {},
                 "average_reward_by_arm": run_summary.get("average_reward_by_arm") or {},
+                "stop_reason_counts": run_summary.get("stop_reason_counts") or {},
             }
         )
 
@@ -170,6 +172,9 @@ def aggregate_persisted_runs(
                 "average_llm_confidence": row.get("average_llm_confidence"),
                 "experiment_split": row.get("experiment_split"),
                 "bandit_algorithm": row.get("bandit_algorithm"),
+                "pulls_by_arm": row.get("pulls_by_arm") or {},
+                "average_reward_by_arm": row.get("average_reward_by_arm") or {},
+                "cumulative_reward_by_arm": row.get("cumulative_reward_by_arm") or {},
             }
         )
 

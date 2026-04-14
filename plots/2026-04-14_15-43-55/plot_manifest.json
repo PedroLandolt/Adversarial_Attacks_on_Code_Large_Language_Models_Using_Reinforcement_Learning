@@ -1,0 +1,103 @@
+{
+  "generated_at": "2026-04-14T15:44:00.712975",
+  "run_count": 12,
+  "group_count": 6,
+  "plot_count": 16,
+  "plots": [
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\attack_success_rate_by_policy_mode.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\success_by_benchmark.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\syntax_invalid_rate_by_policy_mode.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\one_shot_vs_iterative_comparison.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\train_validation_test_comparison.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\iterations_to_success_distribution.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\arm_pull_counts.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\average_reward_by_arm.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\arm_preference_over_time_humaneval_agent_based_decision_iterative_full_none.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\arm_preference_over_time_humaneval_random_choice_iterative_full_none.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\arm_preference_over_time_humaneval_rl_bandit_iterative_full_ucb1.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\rl_bandit_evolution_humaneval_rl_bandit_iterative_full_ucb1.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\arm_preference_over_time_mbpp_agent_based_decision_iterative_full_none.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\arm_preference_over_time_mbpp_random_choice_iterative_full_none.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\arm_preference_over_time_mbpp_rl_bandit_iterative_full_ucb1.png",
+    "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\rl_bandit_evolution_mbpp_rl_bandit_iterative_full_ucb1.png"
+  ],
+  "group_artifacts": [
+    {
+      "benchmark": "humaneval",
+      "policy_mode": "agent_based_decision",
+      "experiment_mode": "iterative",
+      "experiment_split": "full",
+      "bandit_algorithm": "none",
+      "figure": "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\arm_preference_over_time_humaneval_agent_based_decision_iterative_full_none.png"
+    },
+    {
+      "benchmark": "humaneval",
+      "policy_mode": "random_choice",
+      "experiment_mode": "iterative",
+      "experiment_split": "full",
+      "bandit_algorithm": "none",
+      "figure": "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\arm_preference_over_time_humaneval_random_choice_iterative_full_none.png"
+    },
+    {
+      "benchmark": "humaneval",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "full",
+      "bandit_algorithm": "ucb1",
+      "figure": "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\arm_preference_over_time_humaneval_rl_bandit_iterative_full_ucb1.png"
+    },
+    {
+      "benchmark": "humaneval",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "full",
+      "bandit_algorithm": "ucb1",
+      "figure": "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\rl_bandit_evolution_humaneval_rl_bandit_iterative_full_ucb1.png"
+    },
+    {
+      "benchmark": "mbpp",
+      "policy_mode": "agent_based_decision",
+      "experiment_mode": "iterative",
+      "experiment_split": "full",
+      "bandit_algorithm": "none",
+      "figure": "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\arm_preference_over_time_mbpp_agent_based_decision_iterative_full_none.png"
+    },
+    {
+      "benchmark": "mbpp",
+      "policy_mode": "random_choice",
+      "experiment_mode": "iterative",
+      "experiment_split": "full",
+      "bandit_algorithm": "none",
+      "figure": "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\arm_preference_over_time_mbpp_random_choice_iterative_full_none.png"
+    },
+    {
+      "benchmark": "mbpp",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "full",
+      "bandit_algorithm": "ucb1",
+      "figure": "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\arm_preference_over_time_mbpp_rl_bandit_iterative_full_ucb1.png"
+    },
+    {
+      "benchmark": "mbpp",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "full",
+      "bandit_algorithm": "ucb1",
+      "figure": "C:\\Users\\cesar\\Desktop\\Landolt\\Tese\\Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning\\plots\\2026-04-14_15-43-55\\rl_bandit_evolution_mbpp_rl_bandit_iterative_full_ucb1.png"
+    }
+  ],
+  "source_summary": {
+    "results_dir": "results",
+    "run_count": 12,
+    "benchmarks": [
+      "humaneval",
+      "mbpp"
+    ],
+    "policy_modes": [
+      "agent_based_decision",
+      "random_choice",
+      "rl_bandit"
+    ]
+  }
+}
