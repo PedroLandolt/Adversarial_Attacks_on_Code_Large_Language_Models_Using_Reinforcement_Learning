@@ -1178,6 +1178,141 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(metadata["stop_reason"], "max_iterations_reached")
         self.assertEqual(generate_call_count, 3)
 
+    async def test_react_stops_at_iteration_zero_when_baseline_already_succeeds(self):
+        sandbox = FakeSandbox()
+        state = DummyState(
+            prompt="Write always_zero.",
+            test_list=["assert always_zero() == 1"],
+        )
+        generate_call_count = 0
+
+        class CountingSelectorPolicy:
+            select_calls = 0
+
+            def __init__(self, _backend):
+                pass
+
+            async def select(self, context):
+                CountingSelectorPolicy.select_calls += 1
+                return SimpleNamespace(tactic_family="injection")
+
+        async def generate_fn(_state):
+            nonlocal generate_call_count
+            generate_call_count += 1
+            return FakeGenerateResponse("def always_zero():\n    return 0\n")
+
+        with (
+            patch.object(benchmark_module, "sandbox", return_value=sandbox),
+            patch.object(
+                benchmark_module,
+                "validate_python_syntax",
+                return_value={"syntax_valid": True, "syntax_error": None},
+            ),
+            patch.object(benchmark_module, "ReactSelectorPolicy", CountingSelectorPolicy),
+            patch.object(
+                benchmark_module,
+                "LLMJudge",
+                lambda backend: FakeJudge(
+                    backend,
+                    decisions=[
+                        SimpleNamespace(
+                            decision="PASS",
+                            confidence=0.95,
+                            reasoning="baseline approved",
+                            vulnerability="none",
+                        )
+                    ],
+                ),
+            ),
+        ):
+            task = benchmark_module.adversarial_code_llm(
+                mutation_strategy="react",
+                use_llm_judge=True,
+                judge_model="same-backend",
+                selector_model="same-backend",
+                max_iterations=3,
+            )
+            solve = task.solver[0]
+            solved_state = await solve(state, generate_fn)
+
+        metadata = solved_state.metadata
+        self.assertTrue(metadata["attack_succeeded"])
+        self.assertEqual(metadata["successful_iteration"], 0)
+        self.assertEqual(metadata["total_iterations"], 0)
+        self.assertEqual(metadata["stop_reason"], "baseline_attack_succeeded")
+        self.assertEqual(len(metadata["all_attempts"]), 0)
+        self.assertTrue(metadata["baseline"]["attack_success"])
+        self.assertEqual(generate_call_count, 1)
+        self.assertEqual(CountingSelectorPolicy.select_calls, 0)
+
+    async def test_rl_bandit_feedback_is_persisted_in_attempt_trace(self):
+        sandbox = FakeSandbox()
+        judge_decisions = [
+            SimpleNamespace(
+                decision="FAIL",
+                confidence=0.2,
+                reasoning="baseline fail",
+                vulnerability="none",
+            ),
+            SimpleNamespace(
+                decision="FAIL",
+                confidence=0.3,
+                reasoning="iteration fail",
+                vulnerability="none",
+            ),
+        ]
+        state = DummyState(
+            prompt="Write add_one.",
+            test_list=["assert add_one(1) == 3"],
+        )
+        generated = [
+            "def add_one(x):\n    return x + 1\n",
+            "def add_one(x):\n    return x + 1\n",
+        ]
+
+        async def generate_fn(_state):
+            return FakeGenerateResponse(generated.pop(0))
+
+        with (
+            patch.object(benchmark_module, "sandbox", return_value=sandbox),
+            patch.object(
+                benchmark_module,
+                "validate_python_syntax",
+                return_value={"syntax_valid": True, "syntax_error": None},
+            ),
+            patch.object(
+                benchmark_module,
+                "LLMJudge",
+                lambda backend: FakeJudge(backend, decisions=judge_decisions),
+            ),
+            patch.object(
+                benchmark_module,
+                "RLBanditSelectorPolicy",
+                FakeBanditSelectorPolicy,
+            ),
+        ):
+            task = benchmark_module.adversarial_code_llm(
+                mutation_strategy="react",
+                policy_mode="rl_bandit",
+                use_llm_judge=True,
+                judge_model="same-backend",
+                selector_model="same-backend",
+                max_iterations=1,
+            )
+            solve = task.solver[0]
+            solved_state = await solve(state, generate_fn)
+
+        attempt = solved_state.metadata["all_attempts"][0]
+        self.assertIn("bandit_feedback", attempt)
+        self.assertEqual(attempt["bandit_feedback"]["arm_id"], "legacy_injection")
+        self.assertIn("trace", attempt)
+        self.assertIn("selector_output", attempt["trace"])
+        self.assertIn("bandit_feedback", attempt["trace"]["selector_output"])
+        self.assertEqual(
+            attempt["trace"]["selector_output"]["bandit_feedback"]["reward_rule"],
+            "benchmark_v1",
+        )
+
     async def test_results_are_persisted_for_two_runs_and_can_be_read_offline(self):
         temp_dir = Path.cwd() / ".tmp_test_results" / uuid4().hex
         results_dir = str(temp_dir / "results")
