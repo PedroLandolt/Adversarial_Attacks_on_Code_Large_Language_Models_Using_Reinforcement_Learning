@@ -5,6 +5,8 @@ Simple, deterministic, no manipulation possible.
 This is the ground truth baseline.
 """
 
+__test__ = False
+
 from dataclasses import dataclass
 
 

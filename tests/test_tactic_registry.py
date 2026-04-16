@@ -104,7 +104,11 @@ class TacticRegistryTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(entry.renderer_binding)
 
     async def test_selector_policy_returns_registry_backed_decision(self):
-        policy = ReactSelectorPolicy(selector_model="dummy-model", environment="benchmark")
+        class SemanticModel:
+            async def generate(self, *args, **kwargs):
+                return SimpleNamespace(completion="semantic")
+
+        policy = ReactSelectorPolicy(selector_model=SemanticModel(), environment="benchmark")
         decision = await policy.select(
             SelectorContext(
                 problem="Write increment.",

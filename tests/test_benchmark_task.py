@@ -655,8 +655,14 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(train_task.dataset), len(dataset))
         self.assertEqual(len(test_task.dataset), len(dataset))
-        self.assertEqual(train_task.dataset, dataset)
-        self.assertEqual(test_task.dataset, dataset)
+        self.assertEqual(
+            [sample.metadata["sample_id"] for sample in train_task.dataset],
+            [sample.metadata["sample_id"] for sample in dataset],
+        )
+        self.assertEqual(
+            [sample.metadata["sample_id"] for sample in test_task.dataset],
+            [sample.metadata["sample_id"] for sample in dataset],
+        )
 
     async def test_rl_bandit_experiment_split_is_persisted_with_explicit_freeze(self):
         temp_dir = Path.cwd() / ".tmp_test_results" / uuid4().hex

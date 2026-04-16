@@ -71,6 +71,15 @@ from utils.results_persistence import persist_run_results
 from utils.syntax_validator import validate_python_syntax
 
 
+def _normalize_model_backend(model_name: str | None) -> str | None:
+    if model_name is None:
+        return None
+    normalized_model_name = str(model_name).strip()
+    if normalized_model_name.lower() == "same-backend":
+        return None
+    return normalized_model_name
+
+
 @task
 def adversarial_code_llm(
     benchmark: str = "mbpp",
@@ -140,20 +149,22 @@ def adversarial_code_llm(
     if use_instruction_perturbation:
         mutators.append(("instruction_perturbation", instruction_perturbation()))
 
-    selector_backend = selector_model if selector_model else judge_model
+    judge_backend = _normalize_model_backend(judge_model)
+    selector_backend = _normalize_model_backend(selector_model) or judge_backend
     shared_judge_selector_model = None
     if (
         use_llm_judge
         and mutation_strategy == "react"
         and policy_mode == "agent_based_decision"
-        and selector_backend == judge_model
+        and selector_backend is not None
+        and selector_backend == judge_backend
     ):
-        shared_judge_selector_model = get_model(judge_model)
+        shared_judge_selector_model = get_model(judge_backend)
 
     # Initialize judges
     llm_judge_instance = None
     if use_llm_judge:
-        llm_judge_instance = LLMJudge(shared_judge_selector_model or judge_model)
+        llm_judge_instance = LLMJudge(shared_judge_selector_model or judge_backend)
 
     # Initialize selector policy (react by default for current phase)
     selector_policy = None
@@ -1948,7 +1959,8 @@ def adversarial_gitea_react_attack(
                              github_read_file, github_write_file)
 
     base_task = mbpp(temperature=temperature)
-    selector_backend = selector_model if selector_model else judge_model
+    judge_backend = _normalize_model_backend(judge_model)
+    selector_backend = _normalize_model_backend(selector_model) or judge_backend
     selector_policy = ReactSelectorPolicy(selector_backend)
 
     list_files_tool = github_list_files()

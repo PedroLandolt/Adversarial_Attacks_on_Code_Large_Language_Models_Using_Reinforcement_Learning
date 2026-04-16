@@ -36,7 +36,7 @@ This contract therefore describes an **evaluator manipulation** benchmark, not j
 
 ### Gitea rule
 
-`V3/gitea/` is protected professor-provided code. Its base `tools.py` and `schemas.py` define the environment contract and must not be rewritten. Thesis work must integrate around that contract.
+`V3/gitea/` is protected externally provided code. Its base `tools.py` and `schemas.py` define the environment contract and must not be rewritten. Thesis work must integrate around that contract.
 
 ### Selector / RL rule
 
