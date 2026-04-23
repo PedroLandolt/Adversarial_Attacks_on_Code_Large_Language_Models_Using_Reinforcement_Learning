@@ -452,95 +452,62 @@ c:/Users/cesar/Desktop/Landolt/Tese/Adversarial_Attacks_on_Code_Large_Language_M
 # Run each command at least twice on different timestamps
 # if you want stronger evolution-over-time evidence.
 
-# MBPP + random_choice
+# 1) TRAIN (70%) -> 1-649
 inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   --model ollama/qwen3.5:0.8b \
   -T benchmark=mbpp \
-  -T mutation_strategy=react \
-  -T policy_mode=random_choice \
-  -T experiment_mode=iterative \
-  -T use_llm_judge=True \
-  -T judge_model=ollama/qwen3.5:0.8b \
-  -T selector_model=ollama/qwen3.5:0.8b \
-  -T max_iterations=2 \
-  --max-samples 2 \
-  --limit 2
-
-# MBPP + agent_based_decision
-inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen3.5:0.8b \
-  -T benchmark=mbpp \
-  -T mutation_strategy=react \
-  -T policy_mode=agent_based_decision \
-  -T selector_use_cot=False \
-  -T experiment_mode=iterative \
-  -T use_llm_judge=True \
-  -T judge_model=ollama/qwen3.5:0.8b \
-  -T selector_model=ollama/qwen3.5:0.8b \
-  -T max_iterations=2 \
-  --max-samples 2 \
-  --limit 2
-
-# MBPP + rl_bandit
-inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen3.5:0.8b \
-  -T benchmark=mbpp \
+  -T experiment_split=train \
+  -T split_definition=mbpp:70_15_15:1-649 \
   -T mutation_strategy=react \
   -T policy_mode=rl_bandit \
   -T bandit_algorithm=ucb1 \
   -T bandit_weights_path=weights/mbpp_ucb1.json \
+  -T bandit_freeze_weights=False \
   -T experiment_mode=iterative \
   -T use_llm_judge=True \
   -T judge_model=ollama/qwen3.5:0.8b \
   -T selector_model=ollama/qwen3.5:0.8b \
-  -T max_iterations=2 \
-  --max-samples 2 \
-  --limit 2
+  -T max_iterations=12 \
+  --max-samples 649 \
+  --limit 649
 
-# HumanEval + random_choice
+# 2) VALIDATION (15%) -> 650-788
 inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   --model ollama/qwen3.5:0.8b \
-  -T benchmark=humaneval \
-  -T mutation_strategy=react \
-  -T policy_mode=random_choice \
-  -T experiment_mode=iterative \
-  -T use_llm_judge=True \
-  -T judge_model=ollama/qwen3.5:0.8b \
-  -T selector_model=ollama/qwen3.5:0.8b \
-  -T max_iterations=2 \
-  --max-samples 2 \
-  --limit 2
-
-# HumanEval + agent_based_decision
-inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen3.5:0.8b \
-  -T benchmark=humaneval \
-  -T mutation_strategy=react \
-  -T policy_mode=agent_based_decision \
-  -T selector_use_cot=False \
-  -T experiment_mode=iterative \
-  -T use_llm_judge=True \
-  -T judge_model=ollama/qwen3.5:0.8b \
-  -T selector_model=ollama/qwen3.5:0.8b \
-  -T max_iterations=2 \
-  --max-samples 2 \
-  --limit 2
-
-# HumanEval + rl_bandit
-inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen3.5:0.8b \
-  -T benchmark=humaneval \
+  -T benchmark=mbpp \
+  -T experiment_split=validation \
+  -T split_definition=mbpp:70_15_15:650-788 \
   -T mutation_strategy=react \
   -T policy_mode=rl_bandit \
   -T bandit_algorithm=ucb1 \
-  -T bandit_weights_path=weights/humaneval_ucb1.json \
+  -T bandit_weights_path=weights/mbpp_ucb1.json \
+  -T bandit_freeze_weights=True \
   -T experiment_mode=iterative \
   -T use_llm_judge=True \
   -T judge_model=ollama/qwen3.5:0.8b \
   -T selector_model=ollama/qwen3.5:0.8b \
-  -T max_iterations=2 \
-  --max-samples 2 \
-  --limit 2
+  -T max_iterations=12 \
+  --max-samples 139 \
+  --limit 139
+
+# 3) TEST (15%) -> 789-927
+inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+  --model ollama/qwen3.5:0.8b \
+  -T benchmark=mbpp \
+  -T experiment_split=test \
+  -T split_definition=mbpp:70_15_15:789-927 \
+  -T mutation_strategy=react \
+  -T policy_mode=rl_bandit \
+  -T bandit_algorithm=ucb1 \
+  -T bandit_weights_path=weights/mbpp_ucb1.json \
+  -T bandit_freeze_weights=True \
+  -T experiment_mode=iterative \
+  -T use_llm_judge=True \
+  -T judge_model=ollama/qwen3.5:0.8b \
+  -T selector_model=ollama/qwen3.5:0.8b \
+  -T max_iterations=12 \
+  --max-samples 139 \
+  --limit 139
 
 
 # 9.3 Rebuild aggregates

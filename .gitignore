@@ -214,5 +214,7 @@ __marimo__/
 
 approve_message.txt
 .tmp_test_results
+.tmp_test_plotting
+.tmp_test_aggregation
 results/
 logs/
