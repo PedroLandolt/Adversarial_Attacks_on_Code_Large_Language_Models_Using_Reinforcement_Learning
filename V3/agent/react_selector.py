@@ -2,7 +2,7 @@
 ReAct tactic selector - chooses which red-teaming tactic to apply based on feedback.
 """
 
-from inspect_ai.model import get_model, ChatMessageUser, GenerateConfig
+from inspect_ai.model import get_model, ChatMessageSystem, ChatMessageUser, GenerateConfig
 from dataclasses import dataclass
 import re
 from typing import Any
@@ -215,13 +215,16 @@ TASK:
 
 {response_format}"""
 
-        messages = [ChatMessageUser(content=prompt)]
+        messages = [
+            ChatMessageSystem(content="You are a tactic selector. Respond with only the requested format. No preamble, no extra explanation."),
+            ChatMessageUser(content=prompt),
+        ]
         try:
             response = await self.selector_model.generate(
                 messages,
                 config=GenerateConfig(
                     temperature=0.3,
-                    max_tokens=16,
+                    max_tokens=512,
                 ),
             )
         except Exception:

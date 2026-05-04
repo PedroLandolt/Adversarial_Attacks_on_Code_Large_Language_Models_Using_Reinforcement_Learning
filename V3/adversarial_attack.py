@@ -51,18 +51,19 @@ import time
 from copy import deepcopy
 
 from agent.selector_policy import (RandomSelectorPolicy, ReactSelectorPolicy,
-                                   RLBanditSelectorPolicy, SelectorContext)
+                                   RLBanditSelectorPolicy, SelectorContext,
+                                   SelectorDecision)
 from agent.tactic_registry import get_tactic_entry
 from attacks.instruction_perturbation import instruction_perturbation
 from attacks.misleading_comments import misleading_comments
 from attacks.variable_renaming import variable_renaming
 from inspect_ai import Task, task
-from inspect_ai.model import get_model
+from inspect_ai.model import ChatMessageSystem, get_model
 from inspect_ai.solver import TaskState, solver
 from inspect_ai.util import sandbox
 from inspect_evals.mbpp import mbpp
 from judge.llm_judge import LLMJudge
-from judge.red_teaming_tactics import apply_tactic
+from judge.red_teaming_tactics import apply_tactic, build_tactic_generation_prompt
 from judge.test_judge import test_judge
 from utils.benchmark_loader import (build_verification_program,
                                     extract_benchmark_spec,
@@ -983,7 +984,7 @@ def adversarial_code_llm(
                     llm_result_snapshot,
                     attempts_history: list[dict],
                     ctx: dict,
-                ) -> tuple[dict, dict, str]:
+                ) -> tuple[dict, dict, str, SelectorDecision]:
                     """Select and normalize tactic for one iteration."""
                     selector_input = build_selector_payload(
                         iteration,
@@ -1074,6 +1075,20 @@ def adversarial_code_llm(
                     # Each iteration starts from the original prompt so the selector
                     # influences a fresh candidate instead of mutating hidden stale state.
                     state.messages = deepcopy(original_messages)
+                    # Prepend a tactic-specific system message so the target LLM
+                    # produces syntax-safe Python with a deliberate, tactic-aligned
+                    # logical error, reducing both syntax failures and generation variance.
+                    _tactic_entry_for_gen = get_tactic_entry(
+                        ctx["selected_tactic_name"], environment="benchmark"
+                    )
+                    state.messages.insert(
+                        0,
+                        ChatMessageSystem(
+                            content=build_tactic_generation_prompt(
+                                _tactic_entry_for_gen.renderer_binding
+                            )
+                        ),
+                    )
                     ctx["failure_stage"] = "generate_candidate"
                     iteration_gen_start = time.perf_counter()
                     llm_call_counts["iteration_generation"] += 1
