@@ -14,7 +14,7 @@ Use these as paste-ready prompts for Claude Code.
 - Do not merge `raw_completion`, `executable_code`, and `review_artifact`.
 - Do not silently change benchmark names or split semantics.
 
-## Task 1 - Strengthen attack generation
+## [ ] Task 1 - Strengthen attack generation
 
 ```text
 Read `V3/adversarial_attack.py`, `V3/agent/selector_policy.py`, `V3/attacks/*`, and the judge logic first.
@@ -29,7 +29,7 @@ Make the smallest local change possible without changing benchmark semantics. If
 Goal: drastically reduce syntax failures and make each tactic more consistent and reproducible.
 ```
 
-## Task 2 - Make tactic prompts robust
+## [ ] Task 2 - Make tactic prompts robust
 
 ```text
 Inspect how attack tactics are defined today and identify each tactic family/type that the system supports.
@@ -43,7 +43,7 @@ Prepare much more robust and direct prompts for generating the selected tactic. 
 The focus is to reduce prompt noise and prevent the LLM from mixing explanation with executable code. I do not want a large or abstract solution; I want something practical, short, and easy for Claude Code to apply with minimal changes.
 ```
 
-## Task 3 - Store datasets and weights on Hugging Face
+## [ ] Task 3 - Store datasets and weights on Hugging Face
 
 ```text
 Investigate and prepare a concrete proposal for storing datasets and weights on Hugging Face in an open-source and updateable way.
@@ -58,7 +58,7 @@ Then implement the minimum integration needed or, if implementation is not yet p
 Do not complicate the architecture. I want compatibility with the current project state.
 ```
 
-## Task 4 - Short note on k-fold in RL
+## [ ] Task 4 - Short note on k-fold in RL
 
 ```text
 Do only brief research and return a Portuguese text of at most 10 lines.
@@ -68,7 +68,7 @@ I want to know whether papers use k-fold in RL, whether they do or not, and why.
 Do not write a long review. I want a short, factual answer that is useful for the methodological decision.
 ```
 
-## Task 5 - Validate attacks one by one
+## [ ] Task 5 - Validate attacks one by one
 
 ```text
 I want a way to test attacks individually in one-shot mode with a specific attack chosen by us.
@@ -82,7 +82,7 @@ Read the current pipeline and implement the smallest possible change to allow:
 The goal is to validate whether we should keep all current attacks or reduce/change the set. Do not break the normal benchmark flow.
 ```
 
-## Task 6 - Diagnose before changing
+## [ ] Task 6 - Diagnose before changing
 
 ```text
 Before changing anything, read `V3/prompt.md`, `V3/adversarial_attack.py`, `V3/agent/selector_policy.py`, and the persistence files.

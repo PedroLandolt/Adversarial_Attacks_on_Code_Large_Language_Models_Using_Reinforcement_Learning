@@ -68,6 +68,7 @@ from judge.test_judge import test_judge
 from utils.benchmark_loader import (build_verification_program,
                                     extract_benchmark_spec,
                                     load_benchmark_task)
+from utils.code_extraction import extract_python_code
 from utils.results_persistence import persist_run_results
 from utils.syntax_validator import validate_python_syntax
 
@@ -105,6 +106,7 @@ def adversarial_code_llm(
     judge_model: str = "ollama/qwen3.5:9b",
     selector_model: str | None = None,
     red_teaming_tactic: str = None,  # "injection" | "output" | "semantic" | "cot" | None
+    forced_tactic: str | None = None,  # Pin a specific tactic ID/family; bypasses selector in react mode.
     bandit_weights_path: str | None = None,
     bandit_freeze_weights: bool = False,
 ) -> Task:
@@ -194,6 +196,10 @@ def adversarial_code_llm(
         else:
             raise ValueError(f"Unsupported policy_mode: {policy_mode}")
 
+    _forced_tactic_entry = None
+    if forced_tactic is not None:
+        _forced_tactic_entry = get_tactic_entry(forced_tactic, environment="benchmark")
+
     @solver
     def iterative_attack():
         async def solve(state: TaskState, generate_fn):
@@ -222,60 +228,6 @@ def adversarial_code_llm(
 
             benchmark_spec = extract_benchmark_spec(state, benchmark)
             problem_text = benchmark_spec.problem_text
-            python_code_block_pattern = re.compile(
-                r"```(?:python)?\s*\n(.*?)```", re.DOTALL | re.IGNORECASE
-            )
-            python_start_pattern = re.compile(
-                r"^\s*(def |class |from |import |async def |@|if __name__ == [\"']__main__[\"']:)"
-            )
-
-            def _try_parse_python(candidate: str) -> str | None:
-                """Return candidate if it parses as Python, else None."""
-                text = str(candidate).strip()
-                if not text:
-                    return None
-                try:
-                    ast.parse(text)
-                    return text
-                except SyntaxError:
-                    return None
-
-            def _trim_to_parsable_prefix(candidate: str) -> str | None:
-                """Trim trailing prose until the prefix parses as Python."""
-                lines = str(candidate).splitlines()
-                for end in range(len(lines), 0, -1):
-                    snippet = "\n".join(lines[:end]).strip()
-                    parsed = _try_parse_python(snippet)
-                    if parsed is not None:
-                        return parsed
-                return None
-
-            def extract_python_code(completion: str) -> str:
-                raw_text = str(completion).strip()
-                if not raw_text:
-                    return raw_text
-
-                direct_parse = _try_parse_python(raw_text)
-                if direct_parse is not None:
-                    return direct_parse
-
-                fenced_matches = python_code_block_pattern.findall(raw_text)
-                for match in fenced_matches:
-                    parsed_block = _trim_to_parsable_prefix(match)
-                    if parsed_block is not None:
-                        return parsed_block
-
-                lines = raw_text.splitlines()
-                for start_index, line in enumerate(lines):
-                    if python_start_pattern.match(line):
-                        parsed_suffix = _trim_to_parsable_prefix(
-                            "\n".join(lines[start_index:])
-                        )
-                        if parsed_suffix is not None:
-                            return parsed_suffix
-
-                return raw_text
-
             async def execute_benchmark_tests(
                 executable_code: str | None, sample_spec
             ) -> dict:
@@ -994,15 +946,27 @@ def adversarial_code_llm(
                         attempts_history,
                     )
                     ctx["failure_stage"] = "select_tactic"
-                    selector_call_start = time.perf_counter()
-                    llm_call_counts["selector"] += 1
-                    llm_call_counts["total"] += 1
-                    selector_decision = await selector_policy.select(
-                        SelectorContext(**selector_input)
-                    )
-                    timings["selector_call_seconds"].append(
-                        time.perf_counter() - selector_call_start
-                    )
+                    if _forced_tactic_entry is not None:
+                        selector_decision = SelectorDecision(
+                            tactic_id=_forced_tactic_entry.tactic_id,
+                            tactic_family=_forced_tactic_entry.tactic_family,
+                            environment_support=_forced_tactic_entry.environment_support,
+                            renderer_binding=_forced_tactic_entry.renderer_binding,
+                            taxonomy_category=_forced_tactic_entry.taxonomy_category,
+                            selector_name="forced_tactic",
+                            selector_reasoning=f"forced:{_forced_tactic_entry.tactic_id}",
+                        )
+                        timings["selector_call_seconds"].append(0.0)
+                    else:
+                        selector_call_start = time.perf_counter()
+                        llm_call_counts["selector"] += 1
+                        llm_call_counts["total"] += 1
+                        selector_decision = await selector_policy.select(
+                            SelectorContext(**selector_input)
+                        )
+                        timings["selector_call_seconds"].append(
+                            time.perf_counter() - selector_call_start
+                        )
                     selector_entry = get_tactic_entry(
                         selector_decision.tactic_family,
                         environment="benchmark",

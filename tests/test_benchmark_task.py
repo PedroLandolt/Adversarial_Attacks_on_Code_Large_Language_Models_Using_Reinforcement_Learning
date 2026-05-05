@@ -32,6 +32,10 @@ def _install_stub_modules() -> None:
 
     model_mod = types.ModuleType("inspect_ai.model")
 
+    class ChatMessageSystem:
+        def __init__(self, content):
+            self.content = content
+
     class ChatMessageUser:
         def __init__(self, content):
             self.content = content
@@ -44,6 +48,7 @@ def _install_stub_modules() -> None:
         async def generate(self, *args, **kwargs):
             return SimpleNamespace(completion="")
 
+    model_mod.ChatMessageSystem = ChatMessageSystem
     model_mod.ChatMessageUser = ChatMessageUser
     model_mod.GenerateConfig = GenerateConfig
     model_mod.get_model = lambda name: DummyModel()
