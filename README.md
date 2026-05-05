@@ -146,7 +146,17 @@ Nine tactics are registered across two families:
 | `taxonomy_recursion_crescendo` | recursion_crescendo | strategy_pacing |
 | `taxonomy_crowding` | crowding | obfuscation_noise |
 
-To test a single tactic in isolation:
+### Editing attack generation prompts
+
+Each tactic's generation prompt is stored in `V3/prompts/tactic_generation.json`. Edit that file to change what kind of bug each tactic introduces — no Python knowledge required. The file contains:
+
+- `"template"` — the surrounding instruction with an `{instruction}` placeholder
+- `"default_instruction"` — fallback used when a binding has no specific entry
+- `"instructions"` — one entry per renderer binding (keyed by the internal name shown in the table above under *Family*)
+
+Changes take effect immediately on the next run.
+
+### Testing a single tactic in isolation
 
 ```bash
 PYTHONPATH=V3 .venv/Scripts/inspect eval V3/adversarial_attack.py@adversarial_code_llm \
