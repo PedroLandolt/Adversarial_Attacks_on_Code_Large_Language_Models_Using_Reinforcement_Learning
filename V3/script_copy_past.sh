@@ -22,9 +22,9 @@
 #   PYTHONPATH=V3 inspect eval ...
 #
 # Model defaults used below:
-# - target model:   ollama/qwen3.5:0.8b
-# - judge model:    ollama/qwen3.5:0.8b
-# - selector model: ollama/qwen3.5:0.8b
+# - target model:   ollama/llama3.1:8b
+# - judge model:    ollama/llama3.1:8b
+# - selector model: ollama/llama3.1:8b
 #
 # Convention:
 # - quick smoke runs use: --max-samples 1 --limit 1
@@ -53,43 +53,43 @@
 
 # # MBPP + random_choice + one_shot
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=mbpp \
 #   -T mutation_strategy=react \
 #   -T policy_mode=random_choice \
 #   -T experiment_mode=one_shot \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=1 \
 #   --max-samples 1 \
 #   --limit 1
 
 # # MBPP + agent_based_decision + one_shot
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=mbpp \
 #   -T mutation_strategy=react \
 #   -T policy_mode=agent_based_decision \
 #   -T experiment_mode=one_shot \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=1 \
 #   --max-samples 1 \
 #   --limit 1
 
 # # MBPP + rl_bandit (ucb1) + one_shot
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=mbpp \
 #   -T mutation_strategy=react \
 #   -T policy_mode=rl_bandit \
 #   -T bandit_algorithm=ucb1 \
 #   -T experiment_mode=one_shot \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=1 \
 #   --max-samples 1 \
 #   --limit 1
@@ -101,43 +101,43 @@
 
 # # MBPP + random_choice + iterative
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=mbpp \
 #   -T mutation_strategy=react \
 #   -T policy_mode=random_choice \
 #   -T experiment_mode=iterative \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
 #   --limit 5
 
 # # MBPP + agent_based_decision + iterative
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=mbpp \
 #   -T mutation_strategy=react \
 #   -T policy_mode=agent_based_decision \
 #   -T experiment_mode=iterative \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
 #   --limit 5
 
 # # MBPP + rl_bandit (ucb1) + iterative
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=mbpp \
 #   -T mutation_strategy=react \
 #   -T policy_mode=rl_bandit \
 #   -T bandit_algorithm=ucb1 \
 #   -T experiment_mode=iterative \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
 #   --limit 5
@@ -151,7 +151,7 @@
 
 # # Train / update weights (train split: 1-179)
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=mbpp \
 #   -T experiment_split=train \
 #   -T split_definition=mbpp:70_15_15:1-179 \
@@ -161,15 +161,15 @@
 #   -T bandit_weights_path=weights/mbpp_ucb1.json \
 #   -T experiment_mode=iterative \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
 #   --limit 5
 
 # # Evaluate with frozen weights (test split: 219-257)
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=mbpp \
 #   -T experiment_split=test \
 #   -T split_definition=mbpp:70_15_15:219-257 \
@@ -180,8 +180,8 @@
 #   -T bandit_freeze_weights=True \
 #   -T experiment_mode=iterative \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
 #   --limit 219-257
@@ -193,43 +193,43 @@
 
 # # HumanEval + random_choice + one_shot
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=humaneval \
 #   -T mutation_strategy=react \
 #   -T policy_mode=random_choice \
 #   -T experiment_mode=one_shot \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=1 \
 #   --max-samples 1 \
 #   --limit 1
 
 # # HumanEval + agent_based_decision + one_shot
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=humaneval \
 #   -T mutation_strategy=react \
 #   -T policy_mode=agent_based_decision \
 #   -T experiment_mode=one_shot \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=1 \
 #   --max-samples 1 \
 #   --limit 1
 
 # # HumanEval + rl_bandit (ucb1) + one_shot
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=humaneval \
 #   -T mutation_strategy=react \
 #   -T policy_mode=rl_bandit \
 #   -T bandit_algorithm=ucb1 \
 #   -T experiment_mode=one_shot \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=1 \
 #   --max-samples 1 \
 #   --limit 1
@@ -241,43 +241,43 @@
 
 # # HumanEval + random_choice + iterative
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=humaneval \
 #   -T mutation_strategy=react \
 #   -T policy_mode=random_choice \
 #   -T experiment_mode=iterative \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
 #   --limit 5
 
 # # HumanEval + agent_based_decision + iterative
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=humaneval \
 #   -T mutation_strategy=react \
 #   -T policy_mode=agent_based_decision \
 #   -T experiment_mode=iterative \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
 #   --limit 5
 
 # # HumanEval + rl_bandit (ucb1) + iterative
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=humaneval \
 #   -T mutation_strategy=react \
 #   -T policy_mode=rl_bandit \
 #   -T bandit_algorithm=ucb1 \
 #   -T experiment_mode=iterative \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
 #   --limit 5
@@ -289,7 +289,7 @@
 
 # # Train / update weights
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=humaneval \
 #   -T experiment_split=train \
 #   -T split_definition=humaneval:70_15_15:train \
@@ -299,15 +299,15 @@
 #   -T bandit_weights_path=weights/humaneval_ucb1.json \
 #   -T experiment_mode=iterative \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
 #   --limit 5
 
 # # Evaluate with frozen weights
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=humaneval \
 #   -T experiment_split=test \
 #   -T split_definition=humaneval:70_15_15:test \
@@ -318,8 +318,8 @@
 #   -T bandit_freeze_weights=True \
 #   -T experiment_mode=iterative \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
 #   --limit 5
@@ -352,7 +352,7 @@
 
 # # MBPP train run (updates weights)
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=mbpp \
 #   -T experiment_split=train \
 #   -T split_definition=mbpp:70_15_15:1-179 \
@@ -362,15 +362,15 @@
 #   -T bandit_weights_path=weights/mbpp_ucb1.json \
 #   -T experiment_mode=iterative \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
 #   --limit 179
 
 # # MBPP validation run (frozen weights)
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=mbpp \
 #   -T experiment_split=validation \
 #   -T split_definition=mbpp:70_15_15:180-218 \
@@ -381,15 +381,15 @@
 #   -T bandit_freeze_weights=True \
 #   -T experiment_mode=iterative \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
 #   --limit 180-218
 
 # # MBPP test run (frozen weights)
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-#   --model ollama/qwen3.5:0.8b \
+#   --model ollama/llama3.1:8b \
 #   -T benchmark=mbpp \
 #   -T experiment_split=test \
 #   -T split_definition=mbpp:70_15_15:219-257 \
@@ -400,8 +400,8 @@
 #   -T bandit_freeze_weights=True \
 #   -T experiment_mode=iterative \
 #   -T use_llm_judge=True \
-#   -T judge_model=ollama/qwen3.5:0.8b \
-#   -T selector_model=ollama/qwen3.5:0.8b \
+#   -T judge_model=ollama/llama3.1:8b \
+#   -T selector_model=ollama/llama3.1:8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
 #   --limit 219-257
@@ -456,7 +456,7 @@ c:/Users/cesar/Desktop/Landolt/Tese/Adversarial_Attacks_on_Code_Large_Language_M
 
 # 1) TRAIN (70%) -> 1-179  (inspect_evals.mbpp has 257 samples total)
 inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen3.5:0.8b \
+  --model ollama/llama3.1:8b \
   -T benchmark=mbpp \
   -T experiment_split=train \
   -T split_definition=mbpp:70_15_15:1-179 \
@@ -467,15 +467,15 @@ inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   -T bandit_freeze_weights=False \
   -T experiment_mode=iterative \
   -T use_llm_judge=True \
-  -T judge_model=ollama/qwen3.5:0.8b \
-  -T selector_model=ollama/qwen3.5:0.8b \
+  -T judge_model=ollama/llama3.1:8b \
+  -T selector_model=ollama/llama3.1:8b \
   -T max_iterations=12 \
   --max-samples 179 \
   --limit 179
 
 # 2) VALIDATION (15%) -> 180-218
 inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen3.5:0.8b \
+  --model ollama/llama3.1:8b \
   -T benchmark=mbpp \
   -T experiment_split=validation \
   -T split_definition=mbpp:70_15_15:180-218 \
@@ -486,15 +486,15 @@ inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   -T bandit_freeze_weights=True \
   -T experiment_mode=iterative \
   -T use_llm_judge=True \
-  -T judge_model=ollama/qwen3.5:0.8b \
-  -T selector_model=ollama/qwen3.5:0.8b \
+  -T judge_model=ollama/llama3.1:8b \
+  -T selector_model=ollama/llama3.1:8b \
   -T max_iterations=12 \
   --max-samples 39 \
   --limit 180-218
 
 # 3) TEST (15%) -> 219-257
 inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen3.5:0.8b \
+  --model ollama/llama3.1:8b \
   -T benchmark=mbpp \
   -T experiment_split=test \
   -T split_definition=mbpp:70_15_15:219-257 \
@@ -505,8 +505,8 @@ inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   -T bandit_freeze_weights=True \
   -T experiment_mode=iterative \
   -T use_llm_judge=True \
-  -T judge_model=ollama/qwen3.5:0.8b \
-  -T selector_model=ollama/qwen3.5:0.8b \
+  -T judge_model=ollama/llama3.1:8b \
+  -T selector_model=ollama/llama3.1:8b \
   -T max_iterations=12 \
   --max-samples 39 \
   --limit 219-257

@@ -275,6 +275,59 @@ def _plot_policy_comparison_test(grouped_summary: list[dict], output_path: Path)
     return _save_figure(fig, output_path)
 
 
+def _plot_success_breakdown(run_rows: list[dict], output_path: Path) -> str | None:
+    """Stacked bar: baseline success vs. tactic-driven success per policy mode."""
+    from collections import defaultdict
+
+    policy_order = ["rl_bandit", "random_choice", "agent_based_decision"]
+    policy_labels = {
+        "rl_bandit": "RL Bandit (UCB1)",
+        "random_choice": "Random",
+        "agent_based_decision": "Agent (CoT)",
+    }
+
+    buckets: dict[str, dict[str, list]] = defaultdict(lambda: {"baseline": [], "tactic": [], "neither": []})
+    for row in run_rows:
+        pm = row.get("policy_mode")
+        if not pm:
+            continue
+        b = bool(row.get("baseline_success"))
+        t = bool(row.get("tactic_driven_success"))
+        buckets[pm]["baseline"].append(float(b))
+        buckets[pm]["tactic"].append(float(t))
+        buckets[pm]["neither"].append(float(not b and not t))
+
+    present = [p for p in policy_order if p in buckets]
+    if not present:
+        return None
+
+    labels = [policy_labels.get(p, p) for p in present]
+    baseline_rates = [_mean(buckets[p]["baseline"]) or 0.0 for p in present]
+    tactic_rates   = [_mean(buckets[p]["tactic"]) or 0.0 for p in present]
+    neither_rates  = [_mean(buckets[p]["neither"]) or 0.0 for p in present]
+
+    x = list(range(len(present)))
+    fig, ax = plt.subplots(figsize=(max(6, len(present) * 2.5), 6))
+
+    ax.bar(x, baseline_rates, label="Baseline (no tactic)", color="#FF7043", alpha=0.85)
+    ax.bar(x, tactic_rates,   label="Tactic-driven",        color="#2196F3", alpha=0.85,
+           bottom=baseline_rates)
+
+    for xi, (b, t) in enumerate(zip(baseline_rates, tactic_rates)):
+        total = b + t
+        if total > 0.005:
+            ax.text(xi, total + 0.015, f"{total:.2f}", ha="center", va="bottom", fontsize=9)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=11)
+    ax.set_ylabel("Rate", fontsize=11)
+    ax.set_title("Attack Success Breakdown: Baseline vs. Tactic-Driven", fontsize=13, fontweight="bold")
+    ax.set_ylim(0, 1.15)
+    ax.legend(loc="upper right", fontsize=10)
+    ax.grid(axis="y", alpha=0.3)
+    return _save_figure(fig, output_path)
+
+
 def _plot_tactic_win_rate(run_rows: list[dict], output_path: Path) -> str | None:
     """Attack success rate per tactic arm for rl_bandit runs."""
     total_success: dict[str, int] = defaultdict(int)
@@ -554,6 +607,13 @@ def generate_plots(aggregation: dict, output_dir: str) -> dict:
     )
     if tactic_win:
         generated_files.append(tactic_win)
+
+    success_breakdown = _plot_success_breakdown(
+        run_rows,
+        output_path / "success_breakdown_baseline_vs_tactic.png",
+    )
+    if success_breakdown:
+        generated_files.append(success_breakdown)
 
     learning_curve = _plot_training_learning_curve(
         run_rows,

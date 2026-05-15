@@ -33,7 +33,7 @@ class ReactTacticSelector:
     
     def __init__(
         self,
-        selector_model: str | Any = "ollama/qwen2.5:7b",
+        selector_model: str | Any = "ollama/llama3.1:8b",
         environment: str = "benchmark",
         use_chain_of_thought: bool = True,
     ):

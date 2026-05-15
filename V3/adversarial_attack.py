@@ -103,7 +103,7 @@ def adversarial_code_llm(
     use_variable_renaming: bool = True,
     use_instruction_perturbation: bool = False,
     use_llm_judge: bool = False,
-    judge_model: str = "ollama/qwen3.5:9b",
+    judge_model: str = "ollama/llama3.1:8b",
     selector_model: str | None = None,
     red_teaming_tactic: str = None,  # "injection" | "output" | "semantic" | "cot" | None
     forced_tactic: str | None = None,  # Pin a specific tactic ID/family; bypasses selector in react mode.
@@ -1501,7 +1501,7 @@ def adversarial_code_llm(
                                     "applied_tactic_action": serialize_tactic_action(
                                         ctx["applied_tactic_name"]
                                     ),
-                                    "test_decision": "SYNTAX_INVALID",
+                                    "test_decision": None,
                                     "test_confidence": None,
                                     "llm_decision": None,
                                     "llm_confidence": None,
@@ -1964,7 +1964,7 @@ def adversarial_code_llm(
 def adversarial_gitea_react_attack(
     temperature: float = 0.3,
     max_iterations: int = 3,
-    judge_model: str = "ollama/qwen3.5:9b",
+    judge_model: str = "ollama/llama3.1:8b",
     selector_model: str | None = None,
     repo: str | None = None,
     base_branch: str = "main",

@@ -516,14 +516,16 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                 rl_attempts[0]["trace"]["selector_output"]["bandit_algorithm"],
                 "ucb1",
             )
-            self.assertEqual(
-                rl_attempts[0]["selected_tactic_action"]["tactic_id"],
-                "legacy_injection",
-            )
-            self.assertEqual(
-                rl_attempts[1]["selected_tactic_action"]["tactic_id"],
-                "legacy_output",
-            )
+            # UCB1 now uses random.choice over unpulled arms, so the exact tactic
+            # order is non-deterministic. Assert valid registry IDs and that the
+            # two iterations picked different arms (exploration guarantee).
+            from agent.tactic_registry import get_tactic_registry
+            valid_ids = {e.tactic_id for e in get_tactic_registry("benchmark")}
+            tactic_0 = rl_attempts[0]["selected_tactic_action"]["tactic_id"]
+            tactic_1 = rl_attempts[1]["selected_tactic_action"]["tactic_id"]
+            self.assertIn(tactic_0, valid_ids)
+            self.assertIn(tactic_1, valid_ids)
+            self.assertNotEqual(tactic_0, tactic_1)
 
             self.assertEqual(random_state.metadata["policy_mode"], "random_choice")
             self.assertEqual(agent_state.metadata["policy_mode"], "agent_based_decision")
@@ -1322,7 +1324,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
         temp_dir = Path.cwd() / ".tmp_test_results" / uuid4().hex
         results_dir = str(temp_dir / "results")
         try:
-            target_model = FakeModelName("ollama/qwen3.5:0.8b")
+            target_model = FakeModelName("ollama/llama3.1:8b")
 
             mbpp_sandbox = FakeSandbox()
             mbpp_task = benchmark_module.adversarial_code_llm(
@@ -1404,7 +1406,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(
                 {config["target_model"] for config in loaded_configs},
-                {"ollama/qwen3.5:0.8b"},
+                {"ollama/llama3.1:8b"},
             )
             self.assertTrue(all(summary["num_samples"] == 1 for summary in loaded_summaries))
             self.assertTrue(all(summary["run_id"] for summary in loaded_summaries))

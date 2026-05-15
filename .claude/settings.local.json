@@ -6,7 +6,7 @@
       "Bash(PYTHONPATH=V3 .venv/Scripts/inspect log --help)",
       "Bash(.venv/Scripts/inspect eval *)",
       "Bash(.venv/Scripts/python.exe -c ' *)",
-      "Bash(PYTHONPATH=V3 .venv/Scripts/inspect eval V3/adversarial_attack.py@adversarial_code_llm --model ollama/qwen3.5:0.8b -T benchmark=mbpp -T mutation_strategy=react -T policy_mode=agent_based_decision -T experiment_mode=one_shot -T use_llm_judge=True -T judge_model=ollama/qwen3.5:0.8b -T selector_model=ollama/qwen3.5:0.8b -T max_iterations=1 --max-samples 1 --limit 1)",
+      "Bash(PYTHONPATH=V3 .venv/Scripts/inspect eval V3/adversarial_attack.py@adversarial_code_llm --model ollama/llama3.1:8b -T benchmark=mbpp -T mutation_strategy=react -T policy_mode=agent_based_decision -T experiment_mode=one_shot -T use_llm_judge=True -T judge_model=ollama/llama3.1:8b -T selector_model=ollama/llama3.1:8b -T max_iterations=1 --max-samples 1 --limit 1)",
       "Bash(python -c 'import json; d=json.load\\(open\\('\\\\''__TRACKED_VAR__/run_summary.json'\\\\''\\)\\); print\\('\\\\''invalid_attempt_rate:'\\\\'', d['\\\\''invalid_attempt_rate'\\\\'']\\)')",
       "Bash(python -c 'import json; lines=[json.loads\\(l\\) for l in open\\('\\\\''__TRACKED_VAR__/attempts.jsonl'\\\\''\\)]; conf=[l.get\\('\\\\''llm_judge_confidence'\\\\'',0\\) for l in lines]; print\\('\\\\''llm_judge_confidence values:'\\\\'', conf\\)')",
       "PowerShell(& .venv/Scripts/python.exe -m inspect_ai log dump logs/2026-05-04T12-38-42-00-00_adversarial-code-llm_nxvq3a77Ryh8Pj3zjJWFhN.eval 2>&1 | Select-Object -First 5)",

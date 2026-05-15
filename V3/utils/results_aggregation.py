@@ -114,6 +114,8 @@ def aggregate_persisted_runs(
                 "average_llm_confidence": _safe_float(run_summary.get("average_llm_confidence")),
                 "successful_samples": run_summary.get("successful_samples"),
                 "failed_samples": run_summary.get("failed_samples"),
+                "baseline_success": run_summary.get("baseline_success"),
+                "tactic_driven_success": run_summary.get("tactic_driven_success"),
                 "success_by_arm": run_summary.get("success_by_arm") or {},
                 "pulls_by_arm": run_summary.get("pulls_by_arm") or {},
                 "cumulative_reward_by_arm": run_summary.get("cumulative_reward_by_arm") or {},
@@ -132,6 +134,8 @@ def aggregate_persisted_runs(
             "average_llm_confidence": [],
             "successful_samples": 0,
             "failed_samples": 0,
+            "baseline_success_count": 0,
+            "tactic_driven_success_count": 0,
             "stop_reason_counts": defaultdict(int),
         }
     )
@@ -156,6 +160,10 @@ def aggregate_persisted_runs(
 
         acc["successful_samples"] += int(row.get("successful_samples") or 0)
         acc["failed_samples"] += int(row.get("failed_samples") or 0)
+        if row.get("baseline_success"):
+            acc["baseline_success_count"] += 1
+        if row.get("tactic_driven_success"):
+            acc["tactic_driven_success_count"] += 1
 
         stop_reasons = row.get("stop_reason_counts") or {}
         for reason, count in stop_reasons.items():
@@ -196,6 +204,8 @@ def aggregate_persisted_runs(
                 "mean_llm_confidence": _average(acc["average_llm_confidence"]),
                 "total_successful_samples": acc["successful_samples"],
                 "total_failed_samples": acc["failed_samples"],
+                "baseline_success_count": acc["baseline_success_count"],
+                "tactic_driven_success_count": acc["tactic_driven_success_count"],
                 "stop_reason_counts": dict(acc["stop_reason_counts"]),
             }
         )

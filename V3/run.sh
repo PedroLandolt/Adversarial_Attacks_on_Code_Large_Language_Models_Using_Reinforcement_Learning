@@ -64,7 +64,7 @@ fi
 # ------------------------------------------------------------
 # Effective config preview
 # ------------------------------------------------------------
-EFFECTIVE_MODEL="${MODEL:-ollama/qwen3.5:0.8b}"
+EFFECTIVE_MODEL="${MODEL:-ollama/llama3.1:8b}"
 EFFECTIVE_JUDGE_MODEL="${JUDGE_MODEL:-$EFFECTIVE_MODEL}"
 EFFECTIVE_SELECTOR_MODEL="${SELECTOR_MODEL:-$EFFECTIVE_JUDGE_MODEL}"
 EFFECTIVE_MAX_ITER="${MAX_ITER:-3}"

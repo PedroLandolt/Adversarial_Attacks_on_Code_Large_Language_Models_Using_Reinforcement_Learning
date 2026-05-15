@@ -32,7 +32,7 @@ set -euo pipefail
 BENCHMARK="${BENCHMARK:-mbpp}"
 EPOCHS="${EPOCHS:-3}"
 MAX_ITERATIONS="${MAX_ITERATIONS:-12}"
-MODEL="${MODEL:-ollama/qwen3.5:0.8b}"
+MODEL="${MODEL:-ollama/llama3.1:8b}"
 JUDGE_MODEL="${JUDGE_MODEL:-$MODEL}"
 SELECTOR_MODEL="${SELECTOR_MODEL:-$JUDGE_MODEL}"
 SAMPLES_CAP=""   # if set, caps ALL phases (train + val + test) for quick smoke testing
@@ -59,6 +59,10 @@ if [[ -f ".venv/Scripts/inspect" ]]; then
     INSPECT_BIN=".venv/Scripts/inspect"
 elif [[ -f ".venv/bin/inspect" ]]; then
     INSPECT_BIN=".venv/bin/inspect"
+elif [[ -f "../.venv/Scripts/inspect" ]]; then
+    INSPECT_BIN="../.venv/Scripts/inspect"
+elif [[ -f "../.venv/bin/inspect" ]]; then
+    INSPECT_BIN="../.venv/bin/inspect"
 else
     INSPECT_BIN="inspect"
 fi
@@ -67,6 +71,10 @@ if [[ -f ".venv/Scripts/python.exe" ]]; then
     PYTHON_BIN=".venv/Scripts/python.exe"
 elif [[ -f ".venv/bin/python" ]]; then
     PYTHON_BIN=".venv/bin/python"
+elif [[ -f "../.venv/Scripts/python.exe" ]]; then
+    PYTHON_BIN="../.venv/Scripts/python.exe"
+elif [[ -f "../.venv/bin/python" ]]; then
+    PYTHON_BIN="../.venv/bin/python"
 else
     PYTHON_BIN="python"
 fi
@@ -95,13 +103,13 @@ fi
 case "$BENCHMARK" in
     mbpp)
         # inspect_evals.mbpp loads the sanitized HuggingFace split: 257 samples total
-        TRAIN_N=179; TRAIN_DEF="mbpp:70_15_15:1-179"; TRAIN_RANGE="179"
+        TRAIN_N=179; TRAIN_RANGE="179"
         VAL_N=39;    VAL_DEF="mbpp:70_15_15:180-218"; VAL_RANGE="180-218"
         TEST_N=39;   TEST_DEF="mbpp:70_15_15:219-257"; TEST_RANGE="219-257"
         ;;
     humaneval)
         # inspect_evals loads standard HumanEval: 164 samples total
-        TRAIN_N=115; TRAIN_DEF="humaneval:70_15_15:1-115"; TRAIN_RANGE="115"
+        TRAIN_N=115; TRAIN_RANGE="115"
         VAL_N=24;    VAL_DEF="humaneval:70_15_15:116-139"; VAL_RANGE="116-139"
         TEST_N=25;   TEST_DEF="humaneval:70_15_15:140-164"; TEST_RANGE="140-164"
         ;;
@@ -116,6 +124,9 @@ if [[ -n "$SAMPLES_CAP" ]]; then
     VAL_N="$SAMPLES_CAP";   VAL_RANGE="$SAMPLES_CAP"
     TEST_N="$SAMPLES_CAP";  TEST_RANGE="$SAMPLES_CAP"
 fi
+
+# Derive TRAIN_DEF after TRAIN_N is finalised so --samples overrides are reflected.
+TRAIN_DEF="${BENCHMARK}:70_15_15:1-${TRAIN_N}"
 
 # -----------------------------------------------------------
 # Logging helper

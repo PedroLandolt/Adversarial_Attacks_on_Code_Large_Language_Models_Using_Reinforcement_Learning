@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 source venv/Scripts/activate
 
-MODEL="${MODEL:-ollama/qwen3.5:9b}"
+MODEL="${MODEL:-ollama/llama3.1:8b}"
 JUDGE_MODEL="${JUDGE_MODEL:-$MODEL}"
 SELECTOR_MODEL="${SELECTOR_MODEL:-$JUDGE_MODEL}"
 MAX_ITER="${MAX_ITER:-3}"

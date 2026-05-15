@@ -86,17 +86,17 @@ weights/
 
 Nine tactics are defined in `V3/agent/tactic_registry.py`. Each has a `tactic_id`, `tactic_family`, `renderer_binding`, and `taxonomy_category`:
 
-| tactic_family | renderer_binding | taxonomy_category |
-|---|---|---|
-| `injection` | `prompt_injection` | structural_logic |
-| `output` | `output_manipulation` | obfuscation_noise |
-| `semantic` | `semantic_inconsistency` | narrative_contextual |
-| `cot` | `cot_poisoning` | strategy_pacing |
-| `roleplay` | `narrative_roleplay` | narrative_contextual |
-| `appeal_to_authority` | `pressure_authority` | pressure_persuasion |
-| `formatting_smuggling` | `structural_formatting_smuggling` | structural_logic |
-| `recursion_crescendo` | `strategy_recursion_crescendo` | strategy_pacing |
-| `crowding` | `obfuscation_crowding` | obfuscation_noise |
+| tactic_family          | renderer_binding                  | taxonomy_category    |
+| ---------------------- | --------------------------------- | -------------------- |
+| `injection`            | `prompt_injection`                | structural_logic     |
+| `output`               | `output_manipulation`             | obfuscation_noise    |
+| `semantic`             | `semantic_inconsistency`          | narrative_contextual |
+| `cot`                  | `cot_poisoning`                   | strategy_pacing      |
+| `roleplay`             | `narrative_roleplay`              | narrative_contextual |
+| `appeal_to_authority`  | `pressure_authority`              | pressure_persuasion  |
+| `formatting_smuggling` | `structural_formatting_smuggling` | structural_logic     |
+| `recursion_crescendo`  | `strategy_recursion_crescendo`    | strategy_pacing      |
+| `crowding`             | `obfuscation_crowding`            | obfuscation_noise    |
 
 `renderer_binding` is the key used to look up tactic-specific system prompts in `V3/prompts/tactic_generation.json` and to dispatch the `apply_tactic()` renderer in `V3/judge/red_teaming_tactics.py`.
 
@@ -187,14 +187,14 @@ Use Inspect with the task entrypoint:
 
 ```bash
 inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen3.5:0.8b \
+  --model ollama/llama3.1:8b \
   -T benchmark=mbpp \
   -T mutation_strategy=react \
   -T policy_mode=agent_based_decision \
   -T experiment_mode=iterative \
   -T use_llm_judge=True \
-  -T judge_model=ollama/qwen3.5:0.8b \
-  -T selector_model=ollama/qwen3.5:0.8b \
+  -T judge_model=ollama/llama3.1:8b \
+  -T selector_model=ollama/llama3.1:8b \
   -T max_iterations=2 \
   --max-samples 2 \
   --limit 2
@@ -202,15 +202,15 @@ inspect eval V3/adversarial_attack.py@adversarial_code_llm \
 
 Key task parameters (`-T`):
 
-| Parameter | Values | Notes |
-|---|---|---|
-| `benchmark` | `mbpp`, `humaneval` | |
-| `policy_mode` | `random_choice`, `agent_based_decision`, `rl_bandit` | |
-| `experiment_mode` | `one_shot`, `iterative` | |
-| `use_llm_judge` | `True`, `False` | |
-| `forced_tactic` | any `tactic_id` | Pins one tactic for isolation testing |
-| `bandit_weights_path` | file path | Resume from `weights/mbpp_ucb1.json` |
-| `bandit_freeze_weights` | `True`, `False` | Score without updating weights |
+| Parameter               | Values                                               | Notes                                 |
+| ----------------------- | ---------------------------------------------------- | ------------------------------------- |
+| `benchmark`             | `mbpp`, `humaneval`                                  |                                       |
+| `policy_mode`           | `random_choice`, `agent_based_decision`, `rl_bandit` |                                       |
+| `experiment_mode`       | `one_shot`, `iterative`                              |                                       |
+| `use_llm_judge`         | `True`, `False`                                      |                                       |
+| `forced_tactic`         | any `tactic_id`                                      | Pins one tactic for isolation testing |
+| `bandit_weights_path`   | file path                                            | Resume from `weights/mbpp_ucb1.json`  |
+| `bandit_freeze_weights` | `True`, `False`                                      | Score without updating weights        |
 
 After running experiments, aggregate and plot:
 
@@ -298,14 +298,14 @@ Run this smoke test **before and after every code change** and do not declare th
 **Smoke test command** (Windows; on Unix/macOS replace `.venv/Scripts/inspect` with `.venv/bin/inspect`):
 ```bash
 PYTHONPATH=V3 .venv/Scripts/inspect eval V3/adversarial_attack.py@adversarial_code_llm \
-  --model ollama/qwen3.5:0.8b \
+  --model ollama/llama3.1:8b \
   -T benchmark=mbpp \
   -T mutation_strategy=react \
   -T policy_mode=agent_based_decision \
   -T experiment_mode=one_shot \
   -T use_llm_judge=True \
-  -T judge_model=ollama/qwen3.5:0.8b \
-  -T selector_model=ollama/qwen3.5:0.8b \
+  -T judge_model=ollama/llama3.1:8b \
+  -T selector_model=ollama/llama3.1:8b \
   -T max_iterations=1 \
   --max-samples 1 \
   --limit 1

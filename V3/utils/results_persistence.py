@@ -166,6 +166,15 @@ def _compute_summary(metadata: dict, attempt_rows: list[dict], run_id: str) -> d
         if row.get("syntax_valid") is False or row.get("failure_stage") in {"attack_application", "iteration_exception"}
     ]
 
+    baseline_success = any(
+        row.get("iteration") == 0 and row.get("attack_success") is True
+        for row in attempt_rows
+    )
+    tactic_driven_success = any(
+        (row.get("iteration") or 0) > 0 and row.get("attack_success") is True
+        for row in attempt_rows
+    )
+
     successful_iteration = metadata.get("successful_iteration")
 
     return {
@@ -182,6 +191,8 @@ def _compute_summary(metadata: dict, attempt_rows: list[dict], run_id: str) -> d
         "attack_success_rate": 1.0 if metadata.get("attack_succeeded") else 0.0,
         "successful_samples": 1 if metadata.get("attack_succeeded") else 0,
         "failed_samples": 0 if metadata.get("attack_succeeded") else 1,
+        "baseline_success": baseline_success,
+        "tactic_driven_success": tactic_driven_success,
         "syntax_invalid_rate": 1.0 if syntax_invalid_present else 0.0,
         "invalid_attempt_rate": (
             len(invalid_attempts) / len(attempt_rows) if attempt_rows else 0.0

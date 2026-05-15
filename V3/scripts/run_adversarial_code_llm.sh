@@ -27,7 +27,7 @@ if [[ -n "$ENV_FILE" ]]; then
     set +a
 fi
 
-MODEL="${MODEL:-ollama/qwen3.5:0.8b}"
+MODEL="${MODEL:-ollama/llama3.1:8b}"
 JUDGE_MODEL="${JUDGE_MODEL:-$MODEL}"
 SELECTOR_MODEL="${SELECTOR_MODEL:-$JUDGE_MODEL}"
 BENCHMARK="mbpp"

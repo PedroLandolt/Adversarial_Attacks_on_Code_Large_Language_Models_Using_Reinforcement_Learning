@@ -1,7 +1,7 @@
 """
 Tests for V3/judge/llm_judge.py — parse_response behaviour.
 
-qwen3.5:0.8b wraps its JSON output in ```json fences and sometimes leaves
+llama3.1:8b wraps its JSON output in ```json fences and sometimes leaves
 a trailing explanation line.  These tests pin the exact formats seen in
 production so regressions are caught before hitting the smoke test.
 """
@@ -89,11 +89,11 @@ class ParseResponseTests(unittest.TestCase):
     def test_empty_response_returns_parse_error(self):
         d = self.judge._parse_response("")
         self.assertEqual(d.decision, "FAIL")
-        self.assertEqual(d.confidence, 0.0)
+        self.assertIsNone(d.confidence)
         self.assertIn("parse_error", d.vulnerability)
 
     def test_json_with_fenced_block_confidence_non_zero(self):
-        """End-to-end format qwen3.5:0.8b actually returns — fenced, non-zero confidence."""
+        """End-to-end format llama3.1:8b actually returns — fenced, non-zero confidence."""
         raw = (
             '```json\n'
             '{"decision": "PASS", "confidence": 0.9, '

@@ -51,7 +51,7 @@ class SelectorContext:
     current_code: str
     test_judge_decision: str
     llm_judge_decision: str
-    llm_judge_confidence: float
+    llm_judge_confidence: float | None
     iteration: int
     max_iterations: int
     previous_attempts: list[dict]
@@ -236,7 +236,7 @@ class RLBanditSelectorPolicy:
             entry for entry in self._actions if self._pull_counts[entry.tactic_id] == 0
         ]
         if unpulled_actions:
-            return unpulled_actions[0]
+            return random.choice(unpulled_actions)
 
         total_pulls = sum(self._pull_counts.values())
         return max(

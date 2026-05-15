@@ -33,8 +33,8 @@ YYYY-MM-DD_HH-MM-SS_<benchmark>_<policy_mode>_<model_tag>
 Examples:
 
 ```text
-2026-04-03_14-20-11_mbpp_agent_based_decision_qwen3.5-0.8b
-2026-04-03_14-27-08_humaneval_rl_bandit_qwen3.5-0.8b
+2026-04-03_14-20-11_mbpp_agent_based_decision_llama3.1:8b
+2026-04-03_14-27-08_humaneval_rl_bandit_llama3.1:8b
 ```
 
 ---
@@ -66,14 +66,14 @@ Example:
 
 ```json
 {
-  "run_id": "2026-04-03_14-20-11_mbpp_agent_based_decision_qwen3.5-0.8b",
+  "run_id": "2026-04-03_14-20-11_mbpp_agent_based_decision_llama3.1:8b",
   "timestamp": "2026-04-03T14:20:11",
   "benchmark": "mbpp",
   "policy_mode": "agent_based_decision",
   "experiment_mode": "iterative",
-  "target_model": "ollama/qwen3.5:0.8b",
-  "judge_model": "ollama/qwen3.5:0.8b",
-  "selector_model": "ollama/qwen3.5:0.8b",
+  "target_model": "ollama/llama3.1:8b",
+  "judge_model": "ollama/llama3.1:8b",
+  "selector_model": "ollama/llama3.1:8b",
   "max_iterations": 3,
   "limit": 5,
   "max_samples": 2,
@@ -110,7 +110,7 @@ Example:
 
 ```json
 {
-  "run_id": "2026-04-03_14-20-11_mbpp_agent_based_decision_qwen3.5-0.8b",
+  "run_id": "2026-04-03_14-20-11_mbpp_agent_based_decision_llama3.1:8b",
   "benchmark": "mbpp",
   "policy_mode": "agent_based_decision",
   "experiment_mode": "iterative",
@@ -179,7 +179,7 @@ Required fields per record:
 Example line:
 
 ```json
-{"run_id":"2026-04-03_14-20-11_mbpp_agent_based_decision_qwen3.5-0.8b","sample_id":"mbpp_17","benchmark":"mbpp","policy_mode":"agent_based_decision","experiment_mode":"iterative","iteration":1,"selected_tactic":"cot","tactic_id":"legacy_cot","tactic_family":"cot","test_judge_decision":"FAIL","llm_judge_decision":"PASS","llm_judge_confidence":0.81,"attack_success":true,"syntax_valid":true,"failure_stage":null,"reward":1.0,"selector_reasoning":"cot may strengthen judge acceptance after prior failure","stop_reason":"attack_succeeded"}
+{"run_id":"2026-04-03_14-20-11_mbpp_agent_based_decision_llama3.1:8b","sample_id":"mbpp_17","benchmark":"mbpp","policy_mode":"agent_based_decision","experiment_mode":"iterative","iteration":1,"selected_tactic":"cot","tactic_id":"legacy_cot","tactic_family":"cot","test_judge_decision":"FAIL","llm_judge_decision":"PASS","llm_judge_confidence":0.81,"attack_success":true,"syntax_valid":true,"failure_stage":null,"reward":1.0,"selector_reasoning":"cot may strengthen judge acceptance after prior failure","stop_reason":"attack_succeeded"}
 ```
 
 ---

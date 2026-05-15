@@ -7,7 +7,7 @@ _PYTHON_CODE_BLOCK = re.compile(r"```(?:python)?\s*\n(.*?)```", re.DOTALL | re.I
 _PYTHON_START = re.compile(
     r"^\s*(def |class |from |import |async def |@|if __name__ == [\"']__main__[\"']:)"
 )
-_THINK_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL)
+_THINK_BLOCK = re.compile(r"<think>(.*?)</think>", re.DOTALL)
 
 
 def _try_parse(candidate: str) -> str | None:

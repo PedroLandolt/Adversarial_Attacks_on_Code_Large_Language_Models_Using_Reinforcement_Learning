@@ -30,7 +30,7 @@ class ThinkBlockStrippingTests(unittest.TestCase):
     def test_python_code_inside_think_block_is_extracted_as_fallback(self):
         """When code appears only inside <think>, it must still be returned.
 
-        qwen3.5:0.8b emits the function body exclusively inside the reasoning
+        llama3.1:8b emits the function body exclusively inside the reasoning
         block, so the extractor must fall back to searching inside <think>
         when nothing parseable is found outside.
         """
