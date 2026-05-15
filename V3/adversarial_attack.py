@@ -63,7 +63,7 @@ from inspect_ai.solver import TaskState, solver
 from inspect_ai.util import sandbox
 from inspect_evals.mbpp import mbpp
 from judge.llm_judge import LLMJudge
-from judge.red_teaming_tactics import apply_tactic, build_tactic_generation_prompt
+from judge.red_teaming_tactics import apply_tactic, build_tactic_generation_prompt, generate_tactic_artifact
 from judge.test_judge import test_judge
 from utils.benchmark_loader import (build_verification_program,
                                     extract_benchmark_spec,
@@ -284,7 +284,7 @@ def adversarial_code_llm(
                     ),
                 }
 
-            def build_artifact_bundle(
+            async def build_artifact_bundle(
                 raw_completion: str | None,
                 *,
                 tactic_name: str | None = None,
@@ -306,31 +306,13 @@ def adversarial_code_llm(
                 }
 
                 if executable_code is not None and tactic_name is not None:
-                    review_artifact = apply_tactic(
+                    review_artifact = await generate_tactic_artifact(
                         executable_code,
                         tactic_name,
-                        problem_text,
-                        metadata={
-                            "iteration": iteration,
-                            "test_decision": (
-                                test_decision_obj.decision
-                                if test_decision_obj
-                                else None
-                            ),
-                            "llm_decision": (
-                                llm_decision_obj.decision if llm_decision_obj else None
-                            ),
-                            "llm_confidence": (
-                                llm_decision_obj.confidence
-                                if llm_decision_obj
-                                else None
-                            ),
-                            "llm_reasoning": (
-                                llm_decision_obj.reasoning if llm_decision_obj else None
-                            ),
-                        },
+                        problem=problem_text,
+                        model_name=selector_backend,
                     )
-                    construction_metadata["review_renderer"] = "apply_tactic"
+                    construction_metadata["review_renderer"] = "generate_tactic_artifact"
 
                 return {
                     "raw_completion": raw_text,
@@ -773,7 +755,7 @@ def adversarial_code_llm(
                 if debug_force_invalid_syntax:
                     # Internal validation-only hook for reproducible syntax-gate checks.
                     baseline_output = "def broken(:\n    return 1\n"
-                baseline_artifact_bundle = build_artifact_bundle(baseline_output)
+                baseline_artifact_bundle = await build_artifact_bundle(baseline_output)
                 final_artifact_bundle = baseline_artifact_bundle
                 baseline_syntax_result = validate_python_syntax(
                     baseline_artifact_bundle["executable_code"]
@@ -1074,7 +1056,7 @@ def adversarial_code_llm(
                         raw_completion
                     )
                     ctx["failure_stage"] = "apply_tactic"
-                    artifact_bundle = build_artifact_bundle(
+                    artifact_bundle = await build_artifact_bundle(
                         raw_completion,
                         tactic_name=applied_tactic_name,
                         iteration=iteration,
@@ -1660,7 +1642,7 @@ def adversarial_code_llm(
                         raw_completion = "[No output generated]"
 
                     failure_stage = "apply_optional_red_teaming_tactic"
-                    artifact_bundle = build_artifact_bundle(
+                    artifact_bundle = await build_artifact_bundle(
                         raw_completion,
                         tactic_name=red_teaming_tactic,
                         iteration=iteration,

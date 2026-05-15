@@ -178,7 +178,12 @@ class RLBanditSelectorPolicy:
                         self._cumulative_rewards[arm_id] = float(reward)
 
     async def select(self, context: SelectorContext) -> SelectorDecision:
-        chosen = self._select_ucb1_action()
+        if self._freeze_weights:
+            chosen = self._select_greedy_action()
+            selection_mode = "greedy"
+        else:
+            chosen = self._select_ucb1_action()
+            selection_mode = "ucb1"
         chosen_arm_id = normalize_arm_id(
             tactic_id=chosen.tactic_id,
             tactic_family=chosen.tactic_family,
@@ -194,6 +199,7 @@ class RLBanditSelectorPolicy:
             bandit_algorithm=self._bandit_algorithm,
             bandit_state={
                 "algorithm": self._bandit_algorithm,
+                "selection_mode": selection_mode,
                 "total_pulls": sum(self._pull_counts.values()),
                 "selected_arm_id": chosen_arm_id,
                 "pull_counts": dict(self._pull_counts),
@@ -230,6 +236,12 @@ class RLBanditSelectorPolicy:
             "reward": reward_info["reward"],
             "reward_rule": reward_info["reward_rule"],
         }
+
+    def _select_greedy_action(self) -> TacticRegistryEntry:
+        unpulled = [e for e in self._actions if self._pull_counts[e.tactic_id] == 0]
+        if unpulled:
+            return random.choice(unpulled)
+        return max(self._actions, key=lambda e: self._average_reward(e.tactic_id))
 
     def _select_ucb1_action(self) -> TacticRegistryEntry:
         unpulled_actions = [

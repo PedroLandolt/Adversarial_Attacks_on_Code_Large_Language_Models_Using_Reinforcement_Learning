@@ -30,7 +30,7 @@ set -euo pipefail
 # Defaults — override via env vars or flags
 # -----------------------------------------------------------
 BENCHMARK="${BENCHMARK:-mbpp}"
-EPOCHS="${EPOCHS:-3}"
+EPOCHS="${EPOCHS:-5}"
 MAX_ITERATIONS="${MAX_ITERATIONS:-12}"
 MODEL="${MODEL:-ollama/llama3.1:8b}"
 JUDGE_MODEL="${JUDGE_MODEL:-$MODEL}"

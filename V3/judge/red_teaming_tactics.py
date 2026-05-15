@@ -20,6 +20,9 @@ _raw_prompts = json.loads(_PROMPTS_FILE.read_text(encoding="utf-8"))
 _GENERATION_TEMPLATE: str = _raw_prompts["template"]
 _DEFAULT_GENERATION_INSTRUCTION: str = _raw_prompts["default_instruction"]
 _TACTIC_GENERATION_INSTRUCTIONS: dict[str, str] = _raw_prompts["instructions"]
+_ARTIFACT_TEMPLATE: str = _raw_prompts.get("artifact_template", "")
+_DEFAULT_ARTIFACT_INSTRUCTION: str = _raw_prompts.get("artifact_default_instruction", "")
+_ARTIFACT_INSTRUCTIONS: dict[str, str] = _raw_prompts.get("artifact_instructions", {})
 
 
 def _extract_function_code(code: str) -> str:
@@ -290,6 +293,40 @@ def apply_tactic(
     
     else:
         return code
+
+
+async def generate_tactic_artifact(
+    code: str,
+    tactic: str,
+    problem: str = "",
+    model_name: str | None = None,
+) -> str:
+    """Generate a code-specific, technically convincing judge-facing review artifact.
+
+    Calls an LLM with the actual code and a tactic-style instruction so the
+    review is grounded in the specific bug introduced, not a generic template.
+    Falls back to apply_tactic() if the LLM call fails or returns empty.
+    """
+    from inspect_ai.model import ChatMessageUser, get_model
+
+    try:
+        entry = get_tactic_entry(tactic, environment="benchmark")
+    except ValueError:
+        entry = None
+    renderer_binding = entry.renderer_binding if entry else tactic
+    instruction = _ARTIFACT_INSTRUCTIONS.get(renderer_binding, _DEFAULT_ARTIFACT_INSTRUCTION)
+    if not instruction or not _ARTIFACT_TEMPLATE:
+        return apply_tactic(code, tactic, problem=problem)
+    prompt = _ARTIFACT_TEMPLATE.format(code=code, problem=problem, instruction=instruction)
+    try:
+        model = get_model(model_name) if model_name else get_model()
+        response = await model.generate([ChatMessageUser(content=prompt)])
+        artifact = (response.completion or "").strip()
+        if artifact:
+            return artifact
+    except Exception:
+        pass
+    return apply_tactic(code, tactic, problem=problem)
 
 
 def build_tactic_generation_prompt(renderer_binding: str) -> str:
