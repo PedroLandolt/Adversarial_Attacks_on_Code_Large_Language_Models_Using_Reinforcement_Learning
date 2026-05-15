@@ -214,6 +214,142 @@ def _plot_time_series(
     return _save_figure(fig, output_path)
 
 
+def _plot_policy_comparison_test(grouped_summary: list[dict], output_path: Path) -> str | None:
+    """Test-split policy comparison — the headline thesis result."""
+    test_groups = [g for g in grouped_summary if g.get("experiment_split") == "test"]
+    if not test_groups:
+        return None
+
+    benchmarks = sorted({str(g.get("benchmark") or "") for g in test_groups if g.get("benchmark")})
+    policy_order = ["rl_bandit", "random_choice", "agent_based_decision"]
+    policy_labels = {
+        "rl_bandit": "RL Bandit (UCB1)",
+        "random_choice": "Random",
+        "agent_based_decision": "Agent (CoT)",
+    }
+    policy_colors = {
+        "rl_bandit": "#2196F3",
+        "random_choice": "#FF9800",
+        "agent_based_decision": "#4CAF50",
+    }
+    present_policies = [p for p in policy_order if any(g.get("policy_mode") == p for g in test_groups)]
+    if not present_policies or not benchmarks:
+        return None
+
+    lookup: dict[tuple[str, str], dict] = {}
+    for g in test_groups:
+        lookup[(str(g.get("benchmark") or ""), str(g.get("policy_mode") or ""))] = g
+
+    fig, ax = plt.subplots(figsize=(max(7, len(benchmarks) * 3), 6))
+    bar_width = 0.7 / max(len(present_policies), 1)
+    x_positions = list(range(len(benchmarks)))
+
+    for i, policy in enumerate(present_policies):
+        heights, annotations = [], []
+        for bm in benchmarks:
+            g = lookup.get((bm, policy))
+            if g and g.get("mean_attack_success_rate") is not None:
+                heights.append(float(g["mean_attack_success_rate"]))
+                n = g.get("run_count") or 0
+                annotations.append(f"n={n}")
+            else:
+                heights.append(0.0)
+                annotations.append("")
+
+        offsets = [x + (i - (len(present_policies) - 1) / 2) * bar_width for x in x_positions]
+        color = policy_colors.get(policy, f"C{i}")
+        bars = ax.bar(offsets, heights, width=bar_width,
+                      label=policy_labels.get(policy, policy), color=color, alpha=0.85)
+        for bar, ann in zip(bars, annotations):
+            if ann and bar.get_height() > 0.005:
+                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.012,
+                        ann, ha="center", va="bottom", fontsize=8)
+
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(benchmarks, fontsize=11)
+    ax.set_ylabel("Attack Success Rate", fontsize=11)
+    ax.set_title("Policy Comparison — Test Split", fontsize=13, fontweight="bold")
+    ax.set_ylim(0, 1.1)
+    ax.legend(loc="upper right", fontsize=10)
+    ax.grid(axis="y", alpha=0.3)
+    return _save_figure(fig, output_path)
+
+
+def _plot_tactic_win_rate(run_rows: list[dict], output_path: Path) -> str | None:
+    """Attack success rate per tactic arm for rl_bandit runs."""
+    total_success: dict[str, int] = defaultdict(int)
+    total_pulls: dict[str, int] = defaultdict(int)
+
+    for row in run_rows:
+        if row.get("policy_mode") != "rl_bandit":
+            continue
+        for arm_id, count in (row.get("success_by_arm") or {}).items():
+            total_success[str(arm_id)] += int(count)
+        for arm_id, count in (row.get("pulls_by_arm") or {}).items():
+            total_pulls[str(arm_id)] += int(count)
+
+    entries = [
+        {"arm": arm_id, "win_rate": total_success[arm_id] / pulls, "pulls": pulls}
+        for arm_id, pulls in total_pulls.items()
+        if pulls > 0
+    ]
+    if not entries:
+        return None
+    entries.sort(key=lambda e: e["win_rate"], reverse=True)
+
+    labels = [e["arm"].replace("_", "\n") for e in entries]
+    values = [e["win_rate"] for e in entries]
+    annotations = [f"n={e['pulls']}" for e in entries]
+
+    fig, ax = plt.subplots(figsize=(9, max(5, len(labels) * 0.55)))
+    positions = list(range(len(labels)))
+    bars = ax.barh(positions, values, color="#2196F3", alpha=0.82)
+    ax.set_yticks(positions)
+    ax.set_yticklabels(labels, fontsize=9)
+    ax.set_xlabel("Attack Success Rate", fontsize=11)
+    ax.set_title("Tactic Win Rate — RL Bandit", fontsize=13, fontweight="bold")
+    ax.set_xlim(0, 1.1)
+    for bar, ann in zip(bars, annotations):
+        ax.text(bar.get_width() + 0.015, bar.get_y() + bar.get_height() / 2,
+                ann, ha="left", va="center", fontsize=8)
+    ax.grid(axis="x", alpha=0.3)
+    return _save_figure(fig, output_path)
+
+
+def _plot_training_learning_curve(run_rows: list[dict], output_path: Path) -> str | None:
+    """Rolling mean of attack success rate over rl_bandit training samples."""
+    train_rows = sorted(
+        [r for r in run_rows
+         if r.get("policy_mode") == "rl_bandit" and r.get("experiment_split") == "train"],
+        key=lambda r: r.get("timestamp") or "",
+    )
+    if len(train_rows) < 10:
+        return None
+
+    values = [float(r.get("attack_success_rate") or 0.0) for r in train_rows]
+    window = min(30, max(10, len(values) // 8))
+    rolling = [
+        sum(values[max(0, i - window + 1): i + 1]) / (i - max(0, i - window + 1) + 1)
+        for i in range(len(values))
+    ]
+    x = list(range(1, len(values) + 1))
+    overall_mean = sum(values) / len(values)
+
+    fig, ax = plt.subplots(figsize=(11, 5))
+    ax.scatter(x, values, alpha=0.15, s=8, color="#90CAF9", zorder=1)
+    ax.plot(x, rolling, color="#2196F3", linewidth=2,
+            label=f"Rolling mean (w={window})", zorder=2)
+    ax.axhline(y=overall_mean, color="#555", linestyle="--", linewidth=1,
+               label=f"Overall mean = {overall_mean:.3f}", zorder=3)
+    ax.set_xlabel("Training sample", fontsize=11)
+    ax.set_ylabel("Attack Success Rate", fontsize=11)
+    ax.set_title("RL Bandit Learning Curve — Training", fontsize=13, fontweight="bold")
+    ax.set_ylim(0, 1.05)
+    ax.legend(fontsize=10)
+    ax.grid(alpha=0.25)
+    return _save_figure(fig, output_path)
+
+
 def generate_plots(aggregation: dict, output_dir: str) -> dict:
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -403,6 +539,29 @@ def generate_plots(aggregation: dict, output_dir: str) -> dict:
                     }
                 )
 
+    # --- Thesis-critical plots ---
+
+    policy_test = _plot_policy_comparison_test(
+        grouped_summary,
+        output_path / "policy_comparison_test.png",
+    )
+    if policy_test:
+        generated_files.append(policy_test)
+
+    tactic_win = _plot_tactic_win_rate(
+        run_rows,
+        output_path / "tactic_win_rate.png",
+    )
+    if tactic_win:
+        generated_files.append(tactic_win)
+
+    learning_curve = _plot_training_learning_curve(
+        run_rows,
+        output_path / "training_learning_curve.png",
+    )
+    if learning_curve:
+        generated_files.append(learning_curve)
+
     manifest = {
         "generated_at": datetime.now().isoformat(),
         "run_count": len(run_rows),
@@ -442,6 +601,12 @@ def parse_args() -> argparse.Namespace:
         dest="policy_modes",
         help="Optional policy mode filter (can be repeated).",
     )
+    parser.add_argument(
+        "--split",
+        action="append",
+        dest="splits",
+        help="Optional experiment split filter: train, validation, test (can be repeated).",
+    )
     return parser.parse_args()
 
 
@@ -453,6 +618,16 @@ def main() -> int:
         benchmarks=args.benchmarks,
         policy_modes=args.policy_modes,
     )
+    if args.splits:
+        split_filter = {s.lower() for s in args.splits}
+        aggregation["runs"] = [
+            r for r in aggregation.get("runs", [])
+            if (r.get("experiment_split") or "").lower() in split_filter
+        ]
+        aggregation["grouped_summary"] = [
+            g for g in aggregation.get("grouped_summary", [])
+            if (g.get("experiment_split") or "").lower() in split_filter
+        ]
     manifest = generate_plots(aggregation, str(output_dir))
 
     print("Plot generation completed")

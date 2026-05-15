@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Claude Code Project Context
 
 This repo is the thesis project **Adversarial Attacks on Code Large Language Models Using Reinforcement Learning**.
@@ -55,8 +59,11 @@ V3/
   judge/
     __init__.py                 # Judge package marker.
     llm_judge.py                # LLM judge wrapper and scoring logic.
-    red_teaming_tactics.py      # Renders tactics into judge-facing artifacts.
+    red_teaming_tactics.py      # Renders tactics into judge-facing artifacts (dispatches by renderer_binding).
     test_judge.py               # Deterministic test judge wrapper.
+  prompts/
+    tactic_generation.json      # Tactic-specific system prompts loaded by red_teaming_tactics.py.
+                                # Edit here to change attack generation behavior without touching Python.
   scripts/
     aggregate_results.py        # Aggregates persisted run outputs.
     run_adversarial_code_llm.sh # Shell preset for benchmark runs.
@@ -66,11 +73,32 @@ V3/
     __init__.py                 # Utility package marker.
     bandit_weights.py           # Persistence helpers for bandit weights.
     benchmark_loader.py         # Benchmark loading and normalization helpers.
+    code_extraction.py          # Extracts Python code blocks from raw LLM completions.
     results_aggregation.py      # Aggregation helpers for result analysis.
     results_persistence.py      # Run config, summary, and attempt persistence.
     reward_accounting.py        # Reward calculation and arm accounting.
-    syntax_validator.py         # Python syntax validation for generated code.
+    syntax_validator.py         # Python syntax validation for generated code (tree-sitter).
+weights/
+  mbpp_ucb1.json                # Persisted UCB1 bandit arm weights (pull_counts + cumulative_rewards).
 ```
+
+## Tactic registry
+
+Nine tactics are defined in `V3/agent/tactic_registry.py`. Each has a `tactic_id`, `tactic_family`, `renderer_binding`, and `taxonomy_category`:
+
+| tactic_family | renderer_binding | taxonomy_category |
+|---|---|---|
+| `injection` | `prompt_injection` | structural_logic |
+| `output` | `output_manipulation` | obfuscation_noise |
+| `semantic` | `semantic_inconsistency` | narrative_contextual |
+| `cot` | `cot_poisoning` | strategy_pacing |
+| `roleplay` | `narrative_roleplay` | narrative_contextual |
+| `appeal_to_authority` | `pressure_authority` | pressure_persuasion |
+| `formatting_smuggling` | `structural_formatting_smuggling` | structural_logic |
+| `recursion_crescendo` | `strategy_recursion_crescendo` | strategy_pacing |
+| `crowding` | `obfuscation_crowding` | obfuscation_noise |
+
+`renderer_binding` is the key used to look up tactic-specific system prompts in `V3/prompts/tactic_generation.json` and to dispatch the `apply_tactic()` renderer in `V3/judge/red_teaming_tactics.py`.
 
 ## Experiment flow
 
@@ -131,6 +159,23 @@ Prefer one-shot validation when testing a specific attack in isolation. Use it t
 - Common variables are `MODEL`, `JUDGE_MODEL`, and `SELECTOR_MODEL`.
 - Use Ollama locally for the default path; make sure the Ollama server is running before launching `ollama/...` models.
 - API keys are only needed if you switch to non-Ollama providers through LiteLLM.
+- **Docker is required**: the benchmark task runs in `sandbox="docker"`. Deterministic test execution uses `sandbox().exec(...)`.
+- **`PYTHONPATH=V3`** is required when invoking Inspect from the repo root. All imports in `adversarial_attack.py` are relative to `V3/` (e.g. `from agent.selector_policy import ...`), not to the repo root.
+
+## Architecture notes
+
+**Conference scope**: `V3/AGENTS.md` defines the active conference-track boundaries: MBPP + HumanEval only, three policy modes, Gitea and sequential RL (SARSA/Q-learning) out of scope. Consult it before adding new policy types or benchmarks.
+
+**Module layering:**
+- `adversarial_attack.py` is the orchestration layer — it owns the benchmark loop, artifact lifecycle, and metadata.
+- `agent/selector_policy.py` defines the `SelectorPolicy` protocol and three concrete implementations (`ReactSelectorPolicy`, `RandomSelectorPolicy`, `RLBanditSelectorPolicy`).
+- `agent/react_selector.py` contains `ReactTacticSelector`, which is the LLM call inside `ReactSelectorPolicy`. It formats a prompt, calls the selector model, and parses the response into a `TacticRegistryEntry`.
+- `judge/red_teaming_tactics.py` contains two entry points: `apply_tactic()` (renders `review_artifact` from `executable_code`) and `build_tactic_generation_prompt()` (returns a system prompt to steer the target LLM during generation).
+- `utils/code_extraction.py` normalizes raw LLM completions into `executable_code` before syntax validation and test execution.
+
+**Shared judge/selector model**: when `judge_model` and `selector_model` resolve to the same backend in `agent_based_decision` + `react` mode, `adversarial_attack.py` creates a single `get_model()` instance shared by both `LLMJudge` and `ReactSelectorPolicy`. Adding a new policy or judge must preserve this sharing opportunity.
+
+**Bandit weight persistence**: `weights/mbpp_ucb1.json` stores `pull_counts` and `cumulative_rewards` keyed by `tactic_id`. Pass `--bandit_weights_path weights/mbpp_ucb1.json` to resume from saved weights. Pass `--bandit_freeze_weights True` to score without updating weights.
 
 ## Data and weights
 
@@ -153,6 +198,40 @@ inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   -T max_iterations=2 \
   --max-samples 2 \
   --limit 2
+```
+
+Key task parameters (`-T`):
+
+| Parameter | Values | Notes |
+|---|---|---|
+| `benchmark` | `mbpp`, `humaneval` | |
+| `policy_mode` | `random_choice`, `agent_based_decision`, `rl_bandit` | |
+| `experiment_mode` | `one_shot`, `iterative` | |
+| `use_llm_judge` | `True`, `False` | |
+| `forced_tactic` | any `tactic_id` | Pins one tactic for isolation testing |
+| `bandit_weights_path` | file path | Resume from `weights/mbpp_ucb1.json` |
+| `bandit_freeze_weights` | `True`, `False` | Score without updating weights |
+
+After running experiments, aggregate and plot:
+
+```bash
+# Aggregate results from all runs in results/
+python V3/scripts/aggregate_results.py
+
+# Generate plots from aggregated data (output goes to plots/)
+python plot.py
+```
+
+`results/` is gitignored; `plots/` is committed.
+
+## Running tests
+
+```bash
+# Full test suite
+PYTHONPATH=V3 python -m pytest tests/ -v
+
+# Single test file
+PYTHONPATH=V3 python -m pytest tests/test_code_extraction.py -v
 ```
 
 ## Results
@@ -216,7 +295,7 @@ Do not touch:
 
 Run this smoke test **before and after every code change** and do not declare the change complete until both runs pass.
 
-**Smoke test command:**
+**Smoke test command** (Windows; on Unix/macOS replace `.venv/Scripts/inspect` with `.venv/bin/inspect`):
 ```bash
 PYTHONPATH=V3 .venv/Scripts/inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   --model ollama/qwen3.5:0.8b \
@@ -240,6 +319,37 @@ PYTHONPATH=V3 .venv/Scripts/inspect eval V3/adversarial_attack.py@adversarial_co
 5. Console output — no Python exceptions or tracebacks.
 
 If any check fails after a change, revert or fix before continuing.
+
+## Current thesis focus
+
+The priority is no longer feature expansion. The focus is:
+
+- stabilizing the RL attack pipeline,
+- producing reproducible experiments,
+- generating measurable benchmark results,
+- preparing artifacts for the paper,
+- and documenting the methodology clearly.
+
+Priority order: reproducible experiments → measurable RL behavior → clean scientific methodology → useful benchmark outputs → paper-ready artifacts.
+
+Avoid architecture changes or abstractions unless they directly improve experimentation or reproducibility.
+
+## Paper
+
+The thesis paper is in `paper/pedro-msc-paper` (LaTeX).
+
+Target writing style: NeurIPS, ICLR, ICML, AAAI, ACL.
+
+Writing guidelines:
+- prefer direct scientific writing,
+- avoid marketing language,
+- avoid overly long sentences,
+- avoid semicolons when possible,
+- avoid em dashes,
+- be explicit and empirical,
+- prefer concrete observations over vague claims.
+
+Every generated result should be easy to export into tables for the paper. Every experiment must be reproducible.
 
 ## Living notes
 

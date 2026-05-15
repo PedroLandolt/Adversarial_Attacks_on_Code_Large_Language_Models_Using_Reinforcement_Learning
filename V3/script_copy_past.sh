@@ -149,12 +149,12 @@
 # #
 # # Use this when you want the bandit to keep learning across runs.
 
-# # Train / update weights
+# # Train / update weights (train split: 1-179)
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
 #   --model ollama/qwen3.5:0.8b \
 #   -T benchmark=mbpp \
 #   -T experiment_split=train \
-#   -T split_definition=mbpp:70_15_15:1-649 \
+#   -T split_definition=mbpp:70_15_15:1-179 \
 #   -T mutation_strategy=react \
 #   -T policy_mode=rl_bandit \
 #   -T bandit_algorithm=ucb1 \
@@ -167,12 +167,12 @@
 #   --max-samples 5 \
 #   --limit 5
 
-# # Evaluate with frozen weights (no further updates)
+# # Evaluate with frozen weights (test split: 219-257)
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
 #   --model ollama/qwen3.5:0.8b \
 #   -T benchmark=mbpp \
 #   -T experiment_split=test \
-#   -T split_definition=mbpp:70_15_15:789-927 \
+#   -T split_definition=mbpp:70_15_15:219-257 \
 #   -T mutation_strategy=react \
 #   -T policy_mode=rl_bandit \
 #   -T bandit_algorithm=ucb1 \
@@ -184,7 +184,7 @@
 #   -T selector_model=ollama/qwen3.5:0.8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
-#   --limit 5
+#   --limit 219-257
 
 
 # # ==========================================================
@@ -329,18 +329,20 @@
 # # 7. Split workflow defaults
 # # ==========================================================
 # #
-# # Recommended default split strategy for current experiments:
-# # - MBPP:      70 / 15 / 15 over 927 samples
-# #   - train:      1-649
-# #   - validation: 650-788
-# #   - test:       789-927
+# # Actual dataset sizes (inspect_evals):
+# # - MBPP (sanitized HuggingFace split): 257 samples
+# # - HumanEval (standard):              164 samples
 # #
-# # - HumanEval: use the same 70 / 15 / 15 convention and record the
-# #   concrete subset in split_definition. If you keep the standard 164-task
-# #   version, a practical default is:
-# #   - train:      1-115
-# #   - validation: 116-139
-# #   - test:       140-164
+# # Recommended split strategy (70 / 15 / 15):
+# # - MBPP:
+# #   - train:      1-179  (179 samples)
+# #   - validation: 180-218 (39 samples)
+# #   - test:       219-257 (39 samples)
+# #
+# # - HumanEval:
+# #   - train:      1-115  (115 samples)
+# #   - validation: 116-139 (24 samples)
+# #   - test:       140-164 (25 samples)
 # #
 # # The benchmark itself should not slice the dataset for this task.
 # # We keep the split explicit through:
@@ -353,7 +355,7 @@
 #   --model ollama/qwen3.5:0.8b \
 #   -T benchmark=mbpp \
 #   -T experiment_split=train \
-#   -T split_definition=mbpp:70_15_15:1-649 \
+#   -T split_definition=mbpp:70_15_15:1-179 \
 #   -T mutation_strategy=react \
 #   -T policy_mode=rl_bandit \
 #   -T bandit_algorithm=ucb1 \
@@ -364,14 +366,14 @@
 #   -T selector_model=ollama/qwen3.5:0.8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
-#   --limit 1-649
+#   --limit 179
 
 # # MBPP validation run (frozen weights)
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
 #   --model ollama/qwen3.5:0.8b \
 #   -T benchmark=mbpp \
 #   -T experiment_split=validation \
-#   -T split_definition=mbpp:70_15_15:650-788 \
+#   -T split_definition=mbpp:70_15_15:180-218 \
 #   -T mutation_strategy=react \
 #   -T policy_mode=rl_bandit \
 #   -T bandit_algorithm=ucb1 \
@@ -383,14 +385,14 @@
 #   -T selector_model=ollama/qwen3.5:0.8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
-#   --limit 650-788
+#   --limit 180-218
 
 # # MBPP test run (frozen weights)
 # inspect eval V3/adversarial_attack.py@adversarial_code_llm \
 #   --model ollama/qwen3.5:0.8b \
 #   -T benchmark=mbpp \
 #   -T experiment_split=test \
-#   -T split_definition=mbpp:70_15_15:789-927 \
+#   -T split_definition=mbpp:70_15_15:219-257 \
 #   -T mutation_strategy=react \
 #   -T policy_mode=rl_bandit \
 #   -T bandit_algorithm=ucb1 \
@@ -402,7 +404,7 @@
 #   -T selector_model=ollama/qwen3.5:0.8b \
 #   -T max_iterations=12 \
 #   --max-samples 5 \
-#   --limit 789-927
+#   --limit 219-257
 
 # ==========================================================
 # 8. Useful variations
@@ -452,12 +454,12 @@ c:/Users/cesar/Desktop/Landolt/Tese/Adversarial_Attacks_on_Code_Large_Language_M
 # Run each command at least twice on different timestamps
 # if you want stronger evolution-over-time evidence.
 
-# 1) TRAIN (70%) -> 1-649
+# 1) TRAIN (70%) -> 1-179  (inspect_evals.mbpp has 257 samples total)
 inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   --model ollama/qwen3.5:0.8b \
   -T benchmark=mbpp \
   -T experiment_split=train \
-  -T split_definition=mbpp:70_15_15:1-649 \
+  -T split_definition=mbpp:70_15_15:1-179 \
   -T mutation_strategy=react \
   -T policy_mode=rl_bandit \
   -T bandit_algorithm=ucb1 \
@@ -468,15 +470,15 @@ inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   -T judge_model=ollama/qwen3.5:0.8b \
   -T selector_model=ollama/qwen3.5:0.8b \
   -T max_iterations=12 \
-  --max-samples 649 \
-  --limit 649
+  --max-samples 179 \
+  --limit 179
 
-# 2) VALIDATION (15%) -> 650-788
+# 2) VALIDATION (15%) -> 180-218
 inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   --model ollama/qwen3.5:0.8b \
   -T benchmark=mbpp \
   -T experiment_split=validation \
-  -T split_definition=mbpp:70_15_15:650-788 \
+  -T split_definition=mbpp:70_15_15:180-218 \
   -T mutation_strategy=react \
   -T policy_mode=rl_bandit \
   -T bandit_algorithm=ucb1 \
@@ -487,15 +489,15 @@ inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   -T judge_model=ollama/qwen3.5:0.8b \
   -T selector_model=ollama/qwen3.5:0.8b \
   -T max_iterations=12 \
-  --max-samples 139 \
-  --limit 139
+  --max-samples 39 \
+  --limit 180-218
 
-# 3) TEST (15%) -> 789-927
+# 3) TEST (15%) -> 219-257
 inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   --model ollama/qwen3.5:0.8b \
   -T benchmark=mbpp \
   -T experiment_split=test \
-  -T split_definition=mbpp:70_15_15:789-927 \
+  -T split_definition=mbpp:70_15_15:219-257 \
   -T mutation_strategy=react \
   -T policy_mode=rl_bandit \
   -T bandit_algorithm=ucb1 \
@@ -506,8 +508,8 @@ inspect eval V3/adversarial_attack.py@adversarial_code_llm \
   -T judge_model=ollama/qwen3.5:0.8b \
   -T selector_model=ollama/qwen3.5:0.8b \
   -T max_iterations=12 \
-  --max-samples 139 \
-  --limit 139
+  --max-samples 39 \
+  --limit 219-257
 
 
 # 9.3 Rebuild aggregates
@@ -582,6 +584,29 @@ print("Plot validation: OK")
 PY
 
 
+# ==========================================================
+# 11. Overnight RL training
+# ==========================================================
+#
+# train_rl_overnight.sh runs N training epochs over the full train split,
+# then scores validation and test with frozen weights.
+# Weights are saved incrementally — interrupted runs preserve partial progress.
+#
+# Foreground (watch progress in terminal):
+#   bash V3/scripts/train_rl_overnight.sh
+#   bash V3/scripts/train_rl_overnight.sh --benchmark humaneval --epochs 5
+#
+# Background (log goes to logs/overnight/):
+#   nohup bash V3/scripts/train_rl_overnight.sh --epochs 3 > /dev/null 2>&1 &
+#
+# Quick smoke test (5 samples, 1 epoch):
+#   bash V3/scripts/train_rl_overnight.sh --samples 5 --epochs 1
+#
+# Follow progress while running:
+#   tail -f $(ls -t logs/overnight/*.log | head -1)
+
+
+# ==========================================================
 # 9.5 Validate evolution evidence (at least one group with >=2 runs)
 c:/Users/cesar/Desktop/Landolt/Tese/Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning/.venv/Scripts/python.exe - <<'PY'
 import json
@@ -613,3 +638,28 @@ if max_runs < 2:
 
 print("Evolution check: OK")
 PY
+
+
+# ==========================================================
+# 12. Full experiment pipeline (RL + random + agent + plots)
+# ==========================================================
+#
+# run_full_experiment.sh trains the RL bandit, then evaluates all 3 policies
+# on the same held-out test split, aggregates results, and generates plots:
+#   - individual plots per policy (rl_bandit / random_choice / agent_based_decision)
+#   - comparison plots with all 3 policies side by side
+#
+# All plots go to plots/<session_timestamp>/{rl_bandit,random_choice,agent_based_decision,comparison}/
+#
+# Foreground:
+#   bash V3/scripts/run_full_experiment.sh
+#   bash V3/scripts/run_full_experiment.sh --benchmark humaneval --epochs 5
+#
+# Background:
+#   nohup bash V3/scripts/run_full_experiment.sh > /dev/null 2>&1 &
+#
+# Smoke test (5 samples, 1 epoch — all phases capped for speed):
+#   bash V3/scripts/run_full_experiment.sh --samples 5 --epochs 1
+#
+# Follow progress:
+#   tail -f $(ls -t logs/experiment/*.log | head -1)

@@ -159,14 +159,16 @@ class RLBanditSelectorPolicy:
             )
         self._environment = environment
         self._bandit_algorithm = bandit_algorithm
-        self._weights_path = weights_path
+        # Resolve to absolute path at init time so cwd changes inside Inspect
+        # do not silently load from or save to a different location.
+        self._weights_path = str(Path(weights_path).resolve()) if weights_path else None
         self._freeze_weights = freeze_weights
         self._actions = get_tactic_registry(environment)
         self._pull_counts = {entry.tactic_id: 0 for entry in self._actions}
         self._cumulative_rewards = {entry.tactic_id: 0.0 for entry in self._actions}
 
-        if weights_path is not None:
-            loaded = _load_bandit_weights(weights_path)
+        if self._weights_path is not None:
+            loaded = _load_bandit_weights(self._weights_path)
             if loaded is not None:
                 for arm_id, count in loaded.get("pull_counts", {}).items():
                     if arm_id in self._pull_counts:

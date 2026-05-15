@@ -2,101 +2,249 @@
 
 Use these as paste-ready prompts for Claude Code.
 
-## Global rules
+---
 
-- Read the relevant files first.
-- Make the smallest change that solves the request.
-- Keep changes local to the owning abstraction.
-- Validate the touched slice after the first substantive edit.
-- Do not change benchmark success semantics.
-- Do not bypass the selector abstraction.
-- Do not hardcode model-specific logic inside the benchmark loop.
-- Do not merge `raw_completion`, `executable_code`, and `review_artifact`.
-- Do not silently change benchmark names or split semantics.
+# Global Rules
 
-## [ ] Task 1 - Strengthen attack generation
+- Read the relevant files before making changes.
+- Keep the architecture simple and reproducible.
+- Prefer local changes over abstractions.
+- Do not silently change benchmark semantics.
+- Do not change attack success criteria unless explicitly requested.
+- Keep attack prompts syntax-safe and deterministic.
+- Avoid unnecessary prompt verbosity.
+- Preserve separation between:
+  - `raw_completion`
+  - `executable_code`
+  - `review_artifact`
+- Every experiment must be reproducible.
+- Every generated result should be easy to export into tables for the paper.
+- Prefer implementations that help produce measurable scientific results.
 
-```text
-Read `V3/adversarial_attack.py`, `V3/agent/selector_policy.py`, `V3/attacks/*`, and the judge logic first.
+---
 
-The current problem is that the LLM generates attack prompts with weak syntax and low consistency, which makes the system fail too often. I want you to strengthen attack generation so that, after RL chooses a tactic, that tactic is always turned by an LLM into a clear, specific, syntax-safe attack instruction.
+# Current Thesis Focus
 
-Make the smallest local change possible without changing benchmark semantics. If needed, improve the prompt/template that generates the attack for each tactic type, but keep these separate:
-- `raw_completion`
-- `executable_code`
-- `review_artifact`
+The priority is no longer feature expansion.
 
-Goal: drastically reduce syntax failures and make each tactic more consistent and reproducible.
-```
+The focus now is:
+- stabilizing the RL attack pipeline,
+- producing reproducible experiments,
+- generating measurable benchmark results,
+- preparing artifacts for the paper,
+- and documenting the methodology clearly.
 
-## [ ] Task 2 - Make tactic prompts robust
+The paper is being written in:
+- `paper/pedro-msc-paper`
 
-```text
-Inspect how attack tactics are defined today and identify each tactic family/type that the system supports.
+The target writing style should resemble papers from:
+- NeurIPS
+- ICLR
+- ICML
+- AAAI
+- ACL
 
-Prepare much more robust and direct prompts for generating the selected tactic. Each attack type must give the LLM enough context to understand:
-- the intent of the attack,
-- the expected output style,
-- what it must not do,
-- how to avoid generating extra text that breaks syntax.
+Writing guidelines:
+- Prefer direct scientific writing.
+- Avoid marketing language.
+- Avoid overly long sentences.
+- Avoid semicolons when possible.
+- Avoid em dashes.
+- Be explicit and empirical.
+- Prefer concrete observations over vague claims.
 
-The focus is to reduce prompt noise and prevent the LLM from mixing explanation with executable code. I do not want a large or abstract solution; I want something practical, short, and easy for Claude Code to apply with minimal changes.
-```
+---
 
-## [ ] Task 3 - Store datasets and weights on Hugging Face
-
-```text
-Investigate and prepare a concrete proposal for storing datasets and weights on Hugging Face in an open-source and updateable way.
-
-Before changing code, identify:
-- where datasets enter the pipeline,
-- where bandit weights or other weights are persisted today,
-- what format would be the cleanest for publishing on Hugging Face.
-
-Then implement the minimum integration needed or, if implementation is not yet prudent, return a short technical proposal with the files and functions that would need to change.
-
-Do not complicate the architecture. I want compatibility with the current project state.
-```
-
-## [ ] Task 4 - Short note on k-fold in RL
+# [ ] Task 1 — Prepare Experiment Pipeline for Paper Results
 
 ```text
-Do only brief research and return a Portuguese text of at most 10 lines.
+Read the current benchmark and RL execution pipeline first.
 
-I want to know whether papers use k-fold in RL, whether they do or not, and why. The goal is to understand whether k-fold makes sense for our evaluation or whether that is not the standard in RL.
+The goal is to prepare the system for reproducible experiments that can directly support the paper results section.
 
-Do not write a long review. I want a short, factual answer that is useful for the methodological decision.
+Before changing code:
+- identify where experiments start,
+- where seeds are defined,
+- where attack success is computed,
+- where outputs/results are stored,
+- and what metrics are already available.
+
+Then implement only the minimum changes needed to:
+- save reproducible run metadata,
+- export results in a paper-friendly format,
+- compare runs consistently,
+- and avoid losing experiment artifacts.
+
+The system should remain simple.
+
+Do not redesign the architecture.
 ```
 
-## [ ] Task 5 - Validate attacks one by one
+---
+
+# [ ] Task 2 — Improve Result Logging for Scientific Analysis
 
 ```text
-I want a way to test attacks individually in one-shot mode with a specific attack chosen by us.
+Inspect how benchmark results are currently stored.
 
-Read the current pipeline and implement the smallest possible change to allow:
-- manually selecting a specific attack/tactic,
-- running one-shot with only that attack,
-- analyzing whether the attack makes sense in isolation,
-- comparing good and bad attacks easily.
+The current output is not sufficiently structured for scientific analysis and paper tables.
 
-The goal is to validate whether we should keep all current attacks or reduce/change the set. Do not break the normal benchmark flow.
+I want the smallest practical improvement that allows:
+- comparing attacks,
+- comparing tactics,
+- comparing RL vs non-RL behavior,
+- tracking success/failure causes,
+- and generating tables later.
+
+Focus on:
+- reproducibility,
+- clean logging,
+- and minimal architecture changes.
+
+Avoid overengineering.
 ```
 
-## [ ] Task 6 - Diagnose before changing
+---
+
+# [ ] Task 3 — Hugging Face Dataset and Weight Persistence
 
 ```text
-Before changing anything, read `V3/prompt.md`, `V3/adversarial_attack.py`, `V3/agent/selector_policy.py`, and the persistence files.
+Investigate how to publish:
+- benchmark datasets,
+- successful attack prompts,
+- failed prompts,
+- RL weights,
+- and experiment metadata
 
-The system is failing a lot because of syntax and weak prompts. I want an objective conclusion about:
-- where attack generation is going wrong,
-- where syntax is being lost,
-- which part of the pipeline should be strengthened first.
+using Hugging Face in a clean and updateable way.
 
-After that, make only the first minimal change that has real impact.
+Before changing code:
+- identify where datasets enter the pipeline,
+- where RL/bandit weights are persisted,
+- and what serialization formats are currently used.
+
+Then:
+- either implement the minimum viable integration,
+- or provide a short technical proposal if implementation is premature.
+
+The solution must remain compatible with the current project structure.
 ```
 
-## Priority reminder
+---
 
-The system must stay simple and reliable. If a change increases syntax failures, prompt noise, or unnecessary complexity, simplify it.
+# [ ] Task 4 — RL Evaluation Methodology Research
 
-When generating or editing attack-related prompts, keep them short, explicit, and syntax-safe. Do not let explanatory text leak into executable code.
+```text
+Do brief research about evaluation methodologies in reinforcement learning papers.
+
+Focus specifically on:
+- whether k-fold cross validation is commonly used in RL,
+- why it is or is not used,
+- and what evaluation strategies are considered standard.
+
+Return:
+- a concise Portuguese summary,
+- maximum 10 lines,
+- focused only on methodological relevance for this thesis.
+```
+
+---
+
+# [ ] Task 5 — Prepare Scientific Analysis of RL Behavior
+
+```text
+Inspect the current RL training loop and selector policy behavior.
+
+The goal is to understand and later explain scientifically:
+- how the RL agent evolves,
+- how tactics are selected,
+- how rewards influence future choices,
+- and whether learning is actually occurring.
+
+I want:
+- minimal instrumentation,
+- interpretable metrics,
+- and outputs that can later support plots/tables in the paper.
+
+Do not add unnecessary complexity.
+```
+
+---
+
+# [ ] Task 6 — Generate Initial Paper Draft Structure
+
+```text
+Read the LaTeX paper structure in:
+- `paper/pedro-msc-paper`
+
+Then prepare an improved scientific draft structure for:
+- Abstract
+- Introduction
+- Related Work
+- Methodology
+- Experiments
+- Results
+- Discussion
+- Limitations
+- Conclusion
+
+Important:
+- the RL methodology section is extremely important,
+- the paper must clearly justify why RL is being used,
+- and the experimental methodology must be reproducible.
+
+Do not generate filler text.
+
+Prefer:
+- placeholders,
+- section scaffolding,
+- TODO markers,
+- and concrete structure suggestions.
+```
+
+---
+
+# [ ] Task 7 — Create Claude Writing Skills for Scientific Style
+
+```text
+Read:
+- https://code.claude.com/docs/en/skills
+
+Then create reusable Claude skills/guidelines for scientific writing in this repository.
+
+The goal is to help future paper writing follow a consistent style inspired by:
+- NeurIPS
+- ICLR
+- ICML
+- AAAI
+- ACL
+
+The writing guidelines should encourage:
+- concise scientific writing,
+- direct claims,
+- empirical reasoning,
+- methodological clarity,
+- and readable paragraph structure.
+
+Avoid:
+- exaggerated claims,
+- marketing language,
+- semicolons,
+- and overly verbose prose.
+
+Keep the skills practical and reusable.
+```
+
+---
+
+# Priority Reminder
+
+The thesis priority is:
+
+1. reproducible experiments,
+2. measurable RL behavior,
+3. clean scientific methodology,
+4. useful benchmark outputs,
+5. and paper-ready artifacts.
+
+Avoid unnecessary architecture changes or abstractions unless they directly improve experimentation or reproducibility.
