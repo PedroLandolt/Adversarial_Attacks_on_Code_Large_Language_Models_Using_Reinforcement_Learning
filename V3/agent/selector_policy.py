@@ -269,3 +269,19 @@ class RLBanditSelectorPolicy:
         return self._average_reward(tactic_id) + math.sqrt(
             (2.0 * math.log(total_pulls)) / pulls
         )
+
+    def arm_stats(self) -> dict[str, dict]:
+        """Return pull counts, mean rewards, and UCB1 scores for all arms."""
+        total_pulls = sum(self._pull_counts.values())
+        return {
+            arm_id: {
+                "pull_count": self._pull_counts[arm_id],
+                "mean_reward": self._average_reward(arm_id),
+                "ucb1_score": (
+                    self._ucb1_score(arm_id, total_pulls)
+                    if total_pulls > 0
+                    else float("inf")
+                ),
+            }
+            for arm_id in self._pull_counts
+        }

@@ -1381,6 +1381,8 @@ def adversarial_code_llm(
                     feedback = selector_policy.record_outcome(
                         selector_decision, attempt_record
                     )
+                    if hasattr(selector_policy, "arm_stats"):
+                        attempt_record["bandit_state_post_update"] = selector_policy.arm_stats()
                     trace = attempt_record.setdefault("trace", {})
                     trace_selector_output = trace.get("selector_output")
                     if not isinstance(trace_selector_output, dict):

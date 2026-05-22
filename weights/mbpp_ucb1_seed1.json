@@ -1,0 +1,24 @@
+{
+  "pull_counts": {
+    "legacy_injection": 529,
+    "legacy_output": 629,
+    "legacy_semantic": 230,
+    "legacy_cot": 94,
+    "taxonomy_roleplay": 48,
+    "taxonomy_appeal_to_authority": 103,
+    "taxonomy_formatting_smuggling": 61,
+    "taxonomy_recursion_crescendo": 64,
+    "taxonomy_crowding": 86
+  },
+  "cumulative_rewards": {
+    "legacy_injection": 241.0,
+    "legacy_output": 300.0,
+    "legacy_semantic": 86.0,
+    "legacy_cot": 21.0,
+    "taxonomy_roleplay": 3.0,
+    "taxonomy_appeal_to_authority": 25.0,
+    "taxonomy_formatting_smuggling": 5.0,
+    "taxonomy_recursion_crescendo": 9.0,
+    "taxonomy_crowding": 6.0
+  }
+}

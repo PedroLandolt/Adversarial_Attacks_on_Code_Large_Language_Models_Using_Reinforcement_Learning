@@ -94,6 +94,7 @@ def _extract_attempt_record(
         "reward_rule": reward_info["reward_rule"],
         "bandit_algorithm": selector_output.get("bandit_algorithm"),
         "bandit_state": selector_output.get("bandit_state"),
+        "bandit_state_post_update": record.get("bandit_state_post_update"),
         "selector_reasoning": selector_output.get("selector_reasoning"),
         "stop_reason": record.get("stop_reason"),
         "raw_completion_summary": _artifact_summary(record.get("raw_completion")),

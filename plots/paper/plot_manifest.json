@@ -1,0 +1,179 @@
+{
+  "generated_at": "2026-05-20T17:16:19.395349",
+  "run_count": 5175,
+  "group_count": 10,
+  "plot_count": 28,
+  "plots": [
+    "plots\\paper\\attack_success_rate_by_policy_mode.png",
+    "plots\\paper\\success_by_benchmark.png",
+    "plots\\paper\\syntax_invalid_rate_by_policy_mode.png",
+    "plots\\paper\\one_shot_vs_iterative_comparison.png",
+    "plots\\paper\\train_validation_test_comparison.png",
+    "plots\\paper\\iterations_to_success_distribution.png",
+    "plots\\paper\\arm_pull_counts.png",
+    "plots\\paper\\average_reward_by_arm.png",
+    "plots\\paper\\arm_preference_over_time_humaneval_agent_based_decision_iterative_test_none.png",
+    "plots\\paper\\arm_preference_over_time_humaneval_random_choice_iterative_test_none.png",
+    "plots\\paper\\arm_preference_over_time_humaneval_rl_bandit_iterative_test_ucb1.png",
+    "plots\\paper\\rl_bandit_evolution_humaneval_rl_bandit_iterative_test_ucb1.png",
+    "plots\\paper\\arm_preference_over_time_humaneval_rl_bandit_iterative_train_ucb1.png",
+    "plots\\paper\\rl_bandit_evolution_humaneval_rl_bandit_iterative_train_ucb1.png",
+    "plots\\paper\\arm_preference_over_time_humaneval_rl_bandit_iterative_validation_ucb1.png",
+    "plots\\paper\\rl_bandit_evolution_humaneval_rl_bandit_iterative_validation_ucb1.png",
+    "plots\\paper\\arm_preference_over_time_mbpp_agent_based_decision_iterative_test_none.png",
+    "plots\\paper\\arm_preference_over_time_mbpp_random_choice_iterative_test_none.png",
+    "plots\\paper\\arm_preference_over_time_mbpp_rl_bandit_iterative_test_ucb1.png",
+    "plots\\paper\\rl_bandit_evolution_mbpp_rl_bandit_iterative_test_ucb1.png",
+    "plots\\paper\\arm_preference_over_time_mbpp_rl_bandit_iterative_train_ucb1.png",
+    "plots\\paper\\rl_bandit_evolution_mbpp_rl_bandit_iterative_train_ucb1.png",
+    "plots\\paper\\arm_preference_over_time_mbpp_rl_bandit_iterative_validation_ucb1.png",
+    "plots\\paper\\rl_bandit_evolution_mbpp_rl_bandit_iterative_validation_ucb1.png",
+    "plots\\paper\\policy_comparison_test.png",
+    "plots\\paper\\tactic_win_rate.png",
+    "plots\\paper\\success_breakdown_baseline_vs_tactic.png",
+    "plots\\paper\\training_learning_curve.png"
+  ],
+  "group_artifacts": [
+    {
+      "benchmark": "humaneval",
+      "policy_mode": "agent_based_decision",
+      "experiment_mode": "iterative",
+      "experiment_split": "test",
+      "bandit_algorithm": "none",
+      "figure": "plots\\paper\\arm_preference_over_time_humaneval_agent_based_decision_iterative_test_none.png"
+    },
+    {
+      "benchmark": "humaneval",
+      "policy_mode": "random_choice",
+      "experiment_mode": "iterative",
+      "experiment_split": "test",
+      "bandit_algorithm": "none",
+      "figure": "plots\\paper\\arm_preference_over_time_humaneval_random_choice_iterative_test_none.png"
+    },
+    {
+      "benchmark": "humaneval",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "test",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\paper\\arm_preference_over_time_humaneval_rl_bandit_iterative_test_ucb1.png"
+    },
+    {
+      "benchmark": "humaneval",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "test",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\paper\\rl_bandit_evolution_humaneval_rl_bandit_iterative_test_ucb1.png"
+    },
+    {
+      "benchmark": "humaneval",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "train",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\paper\\arm_preference_over_time_humaneval_rl_bandit_iterative_train_ucb1.png"
+    },
+    {
+      "benchmark": "humaneval",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "train",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\paper\\rl_bandit_evolution_humaneval_rl_bandit_iterative_train_ucb1.png"
+    },
+    {
+      "benchmark": "humaneval",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "validation",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\paper\\arm_preference_over_time_humaneval_rl_bandit_iterative_validation_ucb1.png"
+    },
+    {
+      "benchmark": "humaneval",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "validation",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\paper\\rl_bandit_evolution_humaneval_rl_bandit_iterative_validation_ucb1.png"
+    },
+    {
+      "benchmark": "mbpp",
+      "policy_mode": "agent_based_decision",
+      "experiment_mode": "iterative",
+      "experiment_split": "test",
+      "bandit_algorithm": "none",
+      "figure": "plots\\paper\\arm_preference_over_time_mbpp_agent_based_decision_iterative_test_none.png"
+    },
+    {
+      "benchmark": "mbpp",
+      "policy_mode": "random_choice",
+      "experiment_mode": "iterative",
+      "experiment_split": "test",
+      "bandit_algorithm": "none",
+      "figure": "plots\\paper\\arm_preference_over_time_mbpp_random_choice_iterative_test_none.png"
+    },
+    {
+      "benchmark": "mbpp",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "test",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\paper\\arm_preference_over_time_mbpp_rl_bandit_iterative_test_ucb1.png"
+    },
+    {
+      "benchmark": "mbpp",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "test",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\paper\\rl_bandit_evolution_mbpp_rl_bandit_iterative_test_ucb1.png"
+    },
+    {
+      "benchmark": "mbpp",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "train",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\paper\\arm_preference_over_time_mbpp_rl_bandit_iterative_train_ucb1.png"
+    },
+    {
+      "benchmark": "mbpp",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "train",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\paper\\rl_bandit_evolution_mbpp_rl_bandit_iterative_train_ucb1.png"
+    },
+    {
+      "benchmark": "mbpp",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "validation",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\paper\\arm_preference_over_time_mbpp_rl_bandit_iterative_validation_ucb1.png"
+    },
+    {
+      "benchmark": "mbpp",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "validation",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\paper\\rl_bandit_evolution_mbpp_rl_bandit_iterative_validation_ucb1.png"
+    }
+  ],
+  "source_summary": {
+    "results_dir": "results",
+    "run_count": 5175,
+    "benchmarks": [
+      "humaneval",
+      "mbpp"
+    ],
+    "policy_modes": [
+      "agent_based_decision",
+      "random_choice",
+      "rl_bandit"
+    ]
+  }
+}

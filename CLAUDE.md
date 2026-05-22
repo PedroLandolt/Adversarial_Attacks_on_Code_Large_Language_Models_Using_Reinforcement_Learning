@@ -29,57 +29,33 @@ Deterministic tests are the ground truth. The LLM judge is the thing being attac
 ```text
 V3/
   adversarial_attack.py        # Main Inspect task for MBPP/HumanEval attack runs.
-  prompt.md                    # Paste-ready Claude Code task prompts.
-  AGENTS.md                    # Agent instructions specific to the V3 subtree.
-  run.sh                       # General shell entrypoint for V3 runs.
-  script_copy_past.sh          # Command helper with ready-to-copy run presets.
-  __init__.py                  # Package marker for V3.
+  AGENTS.md                    # Agent instructions: active conference-track scope.
   agent/
-    __init__.py                # Agent package marker.
-    react_selector.py          # ReAct-style selector implementation used by policies.
-    selector_policy.py         # Shared selector boundary and policy modes.
-    tactic_registry.py         # Registry of tactic families and tactic metadata.
-    tool_pattern_exploration.py # Experimental tooling for tactic/pattern exploration.
-  attacks/
-    __init__.py                # Attack package marker.
-    instruction_perturbation.py # Attack family that perturbs instructions.
-    misleading_comments.py      # Attack family that injects misleading comments.
-    variable_renaming.py        # Attack family that renames variables for obfuscation.
-    gitea_redteam_taxonomy.py   # Taxonomy helpers for the Gitea-oriented path.
-  docs/
-    BANDIT_AND_SPLIT_JUSTIFICATION_NOTE.md # Notes on bandit choice and split strategy.
-    CONFERENCE_BENCHMARK_NOTE.md # Conference-track benchmark scope and guidance.
-    DATA_CONTRACT_ARQUITECTURE.md # Data and architecture contract for the project.
-    MBPP_BENCHMARK_FLOW.md      # MBPP-specific flow and evaluation notes.
-    RESULTS_AND_PLOTTING_CONTRACT.md # Output and plotting contract for persisted runs.
-  gitea/
-    __init__.py                 # Gitea package marker.
-    schemas.py                  # Data contracts for the Gitea path.
-    tools.py                    # Gitea tool bindings and helpers.
+    react_selector.py          # ReactTacticSelector: formats prompt → calls selector model → parses TacticRegistryEntry.
+    selector_policy.py         # SelectorPolicy protocol + 3 concrete policies (Random, ReAct, RLBandit).
+    tactic_registry.py         # Registry of 9 tactics: tactic_id, tactic_family, renderer_binding.
+  attacks/                     # Legacy attack helpers (instruction_perturbation, misleading_comments, variable_renaming).
   judge/
-    __init__.py                 # Judge package marker.
-    llm_judge.py                # LLM judge wrapper and scoring logic.
-    red_teaming_tactics.py      # Renders tactics into judge-facing artifacts (dispatches by renderer_binding).
-    test_judge.py               # Deterministic test judge wrapper.
+    llm_judge.py               # LLM judge wrapper and scoring logic.
+    red_teaming_tactics.py     # Entry points: apply_tactic(), build_tactic_generation_prompt(), generate_tactic_artifact().
+    test_judge.py              # Deterministic test judge wrapper.
   prompts/
-    tactic_generation.json      # Tactic-specific system prompts loaded by red_teaming_tactics.py.
-                                # Edit here to change attack generation behavior without touching Python.
+    tactic_generation.json     # Per-tactic system prompts keyed by renderer_binding. Edit here, not Python.
   scripts/
-    aggregate_results.py        # Aggregates persisted run outputs.
-    run_adversarial_code_llm.sh # Shell preset for benchmark runs.
-    run_adversarial_gitea_react_attack.sh # Shell preset for the Gitea path.
-    setup_gitea.sh              # Helper for setting up Gitea-related tooling.
+    aggregate_results.py       # Aggregates persisted run outputs into results/aggregates/.
+    run_full_experiment.sh     # Full 8-phase pipeline: RL train→val→test, random, agent, aggregate, plot.
+    train_rl_overnight.sh      # Unattended RL training (N epochs) then val/test with frozen weights.
+    run_adversarial_code_llm.sh # Single-run shell preset.
   utils/
-    __init__.py                 # Utility package marker.
-    bandit_weights.py           # Persistence helpers for bandit weights.
-    benchmark_loader.py         # Benchmark loading and normalization helpers.
-    code_extraction.py          # Extracts Python code blocks from raw LLM completions.
-    results_aggregation.py      # Aggregation helpers for result analysis.
-    results_persistence.py      # Run config, summary, and attempt persistence.
-    reward_accounting.py        # Reward calculation and arm accounting.
-    syntax_validator.py         # Python syntax validation for generated code (tree-sitter).
+    bandit_weights.py          # JSON persistence helpers for UCB1 arm weights.
+    benchmark_loader.py        # MBPP / HumanEval loading and normalization.
+    code_extraction.py         # Normalizes raw LLM completions → executable_code.
+    results_aggregation.py     # Aggregation helpers for offline analysis.
+    results_persistence.py     # Writes run_config, run_summary, attempts.jsonl.
+    reward_accounting.py       # Reward calculation and arm accounting.
+    syntax_validator.py        # tree-sitter Python syntax gate; called before every deterministic exec.
 weights/
-  mbpp_ucb1.json                # Persisted UCB1 bandit arm weights (pull_counts + cumulative_rewards).
+  mbpp_ucb1.json               # Persisted UCB1 arm weights (pull_counts + cumulative_rewards).
 ```
 
 ## Tactic registry
@@ -170,8 +146,9 @@ Prefer one-shot validation when testing a specific attack in isolation. Use it t
 - `adversarial_attack.py` is the orchestration layer — it owns the benchmark loop, artifact lifecycle, and metadata.
 - `agent/selector_policy.py` defines the `SelectorPolicy` protocol and three concrete implementations (`ReactSelectorPolicy`, `RandomSelectorPolicy`, `RLBanditSelectorPolicy`).
 - `agent/react_selector.py` contains `ReactTacticSelector`, which is the LLM call inside `ReactSelectorPolicy`. It formats a prompt, calls the selector model, and parses the response into a `TacticRegistryEntry`.
-- `judge/red_teaming_tactics.py` contains two entry points: `apply_tactic()` (renders `review_artifact` from `executable_code`) and `build_tactic_generation_prompt()` (returns a system prompt to steer the target LLM during generation).
+- `judge/red_teaming_tactics.py` has three entry points: `apply_tactic()` (renders `review_artifact` from `executable_code`), `build_tactic_generation_prompt()` (system prompt steering target LLM during generation), and `generate_tactic_artifact()` (generates the attack text itself).
 - `utils/code_extraction.py` normalizes raw LLM completions into `executable_code` before syntax validation and test execution.
+- `utils/syntax_validator.py` runs tree-sitter on `executable_code` before every deterministic test run. Invalid syntax aborts execution and is recorded as a penalized attempt.
 
 **Shared judge/selector model**: when `judge_model` and `selector_model` resolve to the same backend in `agent_based_decision` + `react` mode, `adversarial_attack.py` creates a single `get_model()` instance shared by both `LLMJudge` and `ReactSelectorPolicy`. Adding a new policy or judge must preserve this sharing opportunity.
 
@@ -202,15 +179,19 @@ inspect eval V3/adversarial_attack.py@adversarial_code_llm \
 
 Key task parameters (`-T`):
 
-| Parameter               | Values                                               | Notes                                 |
-| ----------------------- | ---------------------------------------------------- | ------------------------------------- |
-| `benchmark`             | `mbpp`, `humaneval`                                  |                                       |
-| `policy_mode`           | `random_choice`, `agent_based_decision`, `rl_bandit` |                                       |
-| `experiment_mode`       | `one_shot`, `iterative`                              |                                       |
-| `use_llm_judge`         | `True`, `False`                                      |                                       |
-| `forced_tactic`         | any `tactic_id`                                      | Pins one tactic for isolation testing |
-| `bandit_weights_path`   | file path                                            | Resume from `weights/mbpp_ucb1.json`  |
-| `bandit_freeze_weights` | `True`, `False`                                      | Score without updating weights        |
+| Parameter               | Values                                               | Notes                                                                          |
+| ----------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `benchmark`             | `mbpp`, `humaneval`                                  |                                                                                |
+| `policy_mode`           | `random_choice`, `agent_based_decision`, `rl_bandit` |                                                                                |
+| `experiment_mode`       | `one_shot`, `iterative`                              |                                                                                |
+| `use_llm_judge`         | `True`, `False`                                      |                                                                                |
+| `forced_tactic`         | any `tactic_id`                                      | Pins one tactic for isolation testing                                          |
+| `bandit_weights_path`   | **absolute** file path                               | Must be absolute — Inspect changes cwd before task setup; use `os.path.abspath` |
+| `bandit_freeze_weights` | `True`, `False`                                      | Score without updating weights                                                 |
+| `bandit_algorithm`      | `ucb1`                                               | Only UCB1 is supported                                                         |
+| `experiment_split`      | `train`, `validation`, `test`                        | Recorded in run metadata; use with `split_definition`                          |
+| `split_definition`      | e.g. `mbpp:70_15_15:219-257`                         | Encodes benchmark, strategy, and sample range                                  |
+| `selector_use_cot`      | `True`, `False`                                      | Enables chain-of-thought prompting in `agent_based_decision`                   |
 
 After running experiments, aggregate and plot:
 
@@ -223,6 +204,41 @@ python plot.py
 ```
 
 `results/` is gitignored; `plots/` is committed.
+
+### Full experiment pipeline (paper results)
+
+Run all three policies end-to-end (RL train→val→test, random, agent, aggregate, plot) with a single script. Must be run from the project root (`Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning/`):
+
+```bash
+# Full run (5 RL epochs, all samples)
+bash V3/scripts/run_full_experiment.sh
+
+# With options
+bash V3/scripts/run_full_experiment.sh --benchmark humaneval --epochs 5
+
+# Smoke test (caps every phase to 5 samples, 1 epoch)
+bash V3/scripts/run_full_experiment.sh --samples 5 --epochs 1
+
+# Background (logs go to logs/experiment/)
+nohup bash V3/scripts/run_full_experiment.sh > /dev/null 2>&1 &
+```
+
+### RL-only overnight training
+
+```bash
+bash V3/scripts/train_rl_overnight.sh
+bash V3/scripts/train_rl_overnight.sh --benchmark humaneval --epochs 5
+bash V3/scripts/train_rl_overnight.sh --samples 50   # cap train samples (quick test)
+```
+
+Weight checkpoints are saved per epoch (`weights/mbpp_ucb1_epoch_001.json`, …) so interrupted runs preserve progress.
+
+### Benchmark split sizes (70/15/15)
+
+| Benchmark  | Total | Train (1–N) | Val range | Test range |
+| ---------- | ----- | ----------- | --------- | ---------- |
+| MBPP       | 257   | 179         | 180–218   | 219–257    |
+| HumanEval  | 164   | 115         | 116–139   | 140–164    |
 
 ## Running tests
 
@@ -336,7 +352,7 @@ Avoid architecture changes or abstractions unless they directly improve experime
 
 ## Paper
 
-The thesis paper is in `paper/pedro-msc-paper` (LaTeX).
+The thesis paper is in `../pedro-msc-paper/samplepaper.tex` (one level above this directory, in `Tese/pedro-msc-paper/`).
 
 Target writing style: NeurIPS, ICLR, ICML, AAAI, ACL.
 

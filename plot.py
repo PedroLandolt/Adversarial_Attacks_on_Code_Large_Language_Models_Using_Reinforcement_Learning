@@ -5,7 +5,7 @@ from collections import defaultdict
 from datetime import datetime
 import argparse
 import json
-from math import ceil
+from math import ceil, sqrt
 from pathlib import Path
 import sys
 from typing import Any
@@ -21,6 +21,49 @@ if str(V3_ROOT) not in sys.path:
     sys.path.insert(0, str(V3_ROOT))
 
 from utils.results_aggregation import aggregate_persisted_runs
+
+
+# Maps internal tactic IDs to clean display names for figures.
+TACTIC_DISPLAY_NAMES: dict[str, str] = {
+    "legacy_injection": "injection",
+    "legacy_output": "output",
+    "legacy_semantic": "semantic",
+    "legacy_cot": "cot",
+    "taxonomy_roleplay": "roleplay",
+    "taxonomy_appeal_to_authority": "appeal_to_authority",
+    "taxonomy_formatting_smuggling": "formatting_smuggling",
+    "taxonomy_recursion_crescendo": "recursion_crescendo",
+    "taxonomy_crowding": "crowding",
+}
+
+# Color per tactic family for figures.
+TACTIC_FAMILY_COLORS: dict[str, str] = {
+    "injection":            "#E53935",  # structural_logic
+    "formatting_smuggling": "#E53935",
+    "output":               "#FB8C00",  # obfuscation_noise
+    "crowding":             "#FB8C00",
+    "semantic":             "#43A047",  # narrative_contextual
+    "roleplay":             "#43A047",
+    "cot":                  "#1E88E5",  # strategy_pacing
+    "recursion_crescendo":  "#1E88E5",
+    "appeal_to_authority":  "#8E24AA",  # pressure_persuasion
+}
+
+TACTIC_FAMILY_LABEL: dict[str, str] = {
+    "injection":            "Structural Logic",
+    "formatting_smuggling": "Structural Logic",
+    "output":               "Obfuscation & Noise",
+    "crowding":             "Obfuscation & Noise",
+    "semantic":             "Narrative & Context",
+    "roleplay":             "Narrative & Context",
+    "cot":                  "Strategy & Pacing",
+    "recursion_crescendo":  "Strategy & Pacing",
+    "appeal_to_authority":  "Pressure & Persuasion",
+}
+
+
+def _clean_tactic_name(raw_id: str) -> str:
+    return TACTIC_DISPLAY_NAMES.get(str(raw_id), str(raw_id))
 
 
 def _sanitize_filename(text: str) -> str:
@@ -126,29 +169,31 @@ def _plot_single_bar(
     ylabel: str,
     output_path: Path,
     horizontal: bool = False,
+    item_colors: list[str] | None = None,
 ) -> str | None:
     if not items:
         return None
 
     labels = [str(item.get(label_field) or "unknown") for item in items]
     values = [float(item.get(value_field) or 0.0) for item in items]
+    colors = item_colors if item_colors and len(item_colors) == len(labels) else None
 
     fig, ax = plt.subplots(figsize=(max(9, len(labels) * 0.9), 6))
     if horizontal:
         positions = list(range(len(labels)))
-        ax.barh(positions, values)
+        ax.barh(positions, values, color=colors or "#2196F3", alpha=0.85)
         ax.set_yticks(positions)
         ax.set_yticklabels(labels)
         ax.set_xlabel(ylabel)
     else:
         positions = list(range(len(labels)))
-        ax.bar(positions, values)
+        ax.bar(positions, values, color=colors or "#2196F3", alpha=0.85)
         ax.set_xticks(positions)
         ax.set_xticklabels(labels, rotation=20, ha="right")
         ax.set_ylabel(ylabel)
 
     ax.set_title(title)
-    ax.grid(axis="y", alpha=0.25)
+    ax.grid(axis="x" if horizontal else "y", alpha=0.25)
     return _save_figure(fig, output_path)
 
 
@@ -173,48 +218,69 @@ def _plot_time_series(
     title: str,
     ylabel: str,
     output_path: Path,
-    top_n: int = 5,
+    top_n: int = 9,
 ) -> str | None:
+    from matplotlib.ticker import MaxNLocator
+
     runs = evolution_group.get("runs") or []
     if len(runs) < 2:
         return None
 
     arm_totals: dict[str, float] = defaultdict(float)
     for run in runs:
-        pulls_by_arm = run.get("pulls_by_arm") or {}
-        for arm_id, count in pulls_by_arm.items():
+        for arm_id, count in (run.get("pulls_by_arm") or {}).items():
             arm_totals[str(arm_id)] += float(count)
 
     if not arm_totals:
         return None
 
-    top_arms = [arm_id for arm_id, _ in sorted(arm_totals.items(), key=lambda item: item[1], reverse=True)[:top_n]]
+    top_arms = [
+        arm_id for arm_id, _ in
+        sorted(arm_totals.items(), key=lambda item: item[1], reverse=True)[:top_n]
+    ]
     x_positions = list(range(1, len(runs) + 1))
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    for arm_id in top_arms:
-        y_values = []
-        for run in runs:
-            if series_field == "pull_share":
-                pulls_by_arm = run.get("pulls_by_arm") or {}
-                total_pulls = sum(int(value) for value in pulls_by_arm.values())
-                pulls = int(pulls_by_arm.get(arm_id, 0))
-                y_values.append((pulls / total_pulls) if total_pulls else 0.0)
-            else:
-                raise ValueError(f"Unsupported series_field: {series_field}")
-        ax.plot(x_positions, y_values, marker="o", label=arm_id)
+    # Cumulative pull share: at step N, fraction of all pulls so far per arm.
+    cum_arm: dict[str, float] = defaultdict(float)
+    arm_y: dict[str, list[float]] = {a: [] for a in top_arms}
+    for run in runs:
+        for arm_id, count in (run.get("pulls_by_arm") or {}).items():
+            cum_arm[str(arm_id)] += float(count)
+        total = sum(cum_arm.values()) or 1.0
+        for arm_id in top_arms:
+            arm_y[arm_id].append(cum_arm[arm_id] / total)
 
-    ax.set_xticks(x_positions)
-    ax.set_xticklabels([str(index) for index in x_positions])
-    ax.set_xlabel("Run order")
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
-    ax.legend(loc="best")
+    fig, ax = plt.subplots(figsize=(11, 6))
+    for arm_id in top_arms:
+        label = _clean_tactic_name(arm_id)
+        color = TACTIC_FAMILY_COLORS.get(label)
+        ax.plot(x_positions, arm_y[arm_id], linewidth=1.8, label=label, color=color)
+
+    ax.xaxis.set_major_locator(MaxNLocator(nbins=15, integer=True))
+    ax.set_xlabel("Training problem", fontsize=11)
+    ax.set_ylabel(ylabel, fontsize=11)
+    ax.set_title(title, fontsize=13, fontweight="bold")
+    ax.set_ylim(0, None)
+    ax.legend(loc="upper right", fontsize=8, ncol=2)
     ax.grid(alpha=0.25)
     return _save_figure(fig, output_path)
 
 
-def _plot_policy_comparison_test(grouped_summary: list[dict], output_path: Path) -> str | None:
+def _compute_chunk_std(values: list[float], chunk_size: int) -> float:
+    """Std dev of per-chunk means (proxy for seed/repeat variance)."""
+    chunks = [values[i : i + chunk_size] for i in range(0, len(values), chunk_size)]
+    chunk_means = [sum(c) / len(c) for c in chunks if len(c) >= max(1, chunk_size // 2)]
+    if len(chunk_means) < 2:
+        return 0.0
+    mean = sum(chunk_means) / len(chunk_means)
+    return sqrt(sum((x - mean) ** 2 for x in chunk_means) / (len(chunk_means) - 1))
+
+
+def _plot_policy_comparison_test(
+    grouped_summary: list[dict],
+    output_path: Path,
+    run_rows: list[dict] | None = None,
+) -> str | None:
     """Test-split policy comparison — the headline thesis result."""
     test_groups = [g for g in grouped_summary if g.get("experiment_split") == "test"]
     if not test_groups:
@@ -232,6 +298,9 @@ def _plot_policy_comparison_test(grouped_summary: list[dict], output_path: Path)
         "random_choice": "#FF9800",
         "agent_based_decision": "#4CAF50",
     }
+    # MBPP test=39 problems/seed, HumanEval test=25 problems/seed
+    chunk_sizes: dict[str, int] = {"mbpp": 39, "humaneval": 25}
+
     present_policies = [p for p in policy_order if any(g.get("policy_mode") == p for g in test_groups)]
     if not present_policies or not benchmarks:
         return None
@@ -240,37 +309,71 @@ def _plot_policy_comparison_test(grouped_summary: list[dict], output_path: Path)
     for g in test_groups:
         lookup[(str(g.get("benchmark") or ""), str(g.get("policy_mode") or ""))] = g
 
+    # Per-chunk std dev from individual run rows (seed/repeat variance).
+    std_lookup: dict[tuple[str, str], float] = {}
+    if run_rows:
+        buckets: dict[tuple[str, str], list[float]] = defaultdict(list)
+        for row in sorted(run_rows, key=lambda r: r.get("timestamp") or ""):
+            if row.get("experiment_split") != "test":
+                continue
+            bm = str(row.get("benchmark") or "")
+            pm = str(row.get("policy_mode") or "")
+            asr = row.get("attack_success_rate")
+            if asr is not None:
+                buckets[(bm, pm)].append(float(asr))
+        for (bm, pm), vals in buckets.items():
+            cs = chunk_sizes.get(bm, max(1, len(vals) // 3))
+            std_lookup[(bm, pm)] = _compute_chunk_std(vals, cs)
+
     fig, ax = plt.subplots(figsize=(max(7, len(benchmarks) * 3), 6))
     bar_width = 0.7 / max(len(present_policies), 1)
     x_positions = list(range(len(benchmarks)))
 
+    all_heights_pct: list[float] = []
+    bar_data = []
     for i, policy in enumerate(present_policies):
-        heights, annotations = [], []
+        heights_pct, stds_pct, annotations = [], [], []
         for bm in benchmarks:
             g = lookup.get((bm, policy))
             if g and g.get("mean_attack_success_rate") is not None:
-                heights.append(float(g["mean_attack_success_rate"]))
+                mean_val = float(g["mean_attack_success_rate"]) * 100
+                std_val = std_lookup.get((bm, policy), 0.0) * 100
                 n = g.get("run_count") or 0
-                annotations.append(f"n={n}")
             else:
-                heights.append(0.0)
-                annotations.append("")
+                mean_val, std_val, n = 0.0, 0.0, 0
+            heights_pct.append(mean_val)
+            stds_pct.append(std_val)
+            annotations.append(f"{mean_val:.1f}%")
+            all_heights_pct.append(mean_val)
+        bar_data.append((policy, heights_pct, stds_pct, annotations))
 
+    # Zoom y-axis to the actual data range.
+    valid = [h for h in all_heights_pct if h > 0]
+    y_min = max(0.0, (min(valid) - 8.0) // 5 * 5) if valid else 0.0
+    y_max = min(103.0, (max(valid) + 6.0))
+
+    for i, (policy, heights_pct, stds_pct, annotations) in enumerate(bar_data):
         offsets = [x + (i - (len(present_policies) - 1) / 2) * bar_width for x in x_positions]
         color = policy_colors.get(policy, f"C{i}")
-        bars = ax.bar(offsets, heights, width=bar_width,
-                      label=policy_labels.get(policy, policy), color=color, alpha=0.85)
+        bars = ax.bar(
+            offsets, heights_pct, width=bar_width,
+            label=policy_labels.get(policy, policy), color=color, alpha=0.85,
+            yerr=stds_pct, capsize=4, error_kw={"elinewidth": 1.5, "ecolor": "#333333"},
+        )
         for bar, ann in zip(bars, annotations):
-            if ann and bar.get_height() > 0.005:
-                ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.012,
-                        ann, ha="center", va="bottom", fontsize=8)
+            if bar.get_height() > y_min + 0.5:
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + max(stds_pct) + 0.5,
+                    ann, ha="center", va="bottom", fontsize=9, fontweight="bold",
+                )
 
     ax.set_xticks(x_positions)
-    ax.set_xticklabels(benchmarks, fontsize=11)
-    ax.set_ylabel("Attack Success Rate", fontsize=11)
+    ax.set_xticklabels([b.upper() for b in benchmarks], fontsize=12)
+    ax.set_ylabel("Attack Success Rate (%)", fontsize=11)
     ax.set_title("Policy Comparison — Test Split", fontsize=13, fontweight="bold")
-    ax.set_ylim(0, 1.1)
-    ax.legend(loc="upper right", fontsize=10)
+    ax.set_ylim(y_min, y_max)
+    ax.legend(loc="lower right", fontsize=10)
     ax.grid(axis="y", alpha=0.3)
     return _save_figure(fig, output_path)
 
@@ -342,7 +445,11 @@ def _plot_tactic_win_rate(run_rows: list[dict], output_path: Path) -> str | None
             total_pulls[str(arm_id)] += int(count)
 
     entries = [
-        {"arm": arm_id, "win_rate": total_success[arm_id] / pulls, "pulls": pulls}
+        {
+            "arm": _clean_tactic_name(arm_id),
+            "win_rate": total_success[arm_id] / pulls,
+            "pulls": pulls,
+        }
         for arm_id, pulls in total_pulls.items()
         if pulls > 0
     ]
@@ -350,22 +457,35 @@ def _plot_tactic_win_rate(run_rows: list[dict], output_path: Path) -> str | None
         return None
     entries.sort(key=lambda e: e["win_rate"], reverse=True)
 
-    labels = [e["arm"].replace("_", "\n") for e in entries]
-    values = [e["win_rate"] for e in entries]
+    labels = [e["arm"] for e in entries]
+    values = [e["win_rate"] * 100 for e in entries]
     annotations = [f"n={e['pulls']}" for e in entries]
+    colors = [TACTIC_FAMILY_COLORS.get(lbl, "#2196F3") for lbl in labels]
 
-    fig, ax = plt.subplots(figsize=(9, max(5, len(labels) * 0.55)))
+    fig, ax = plt.subplots(figsize=(9, max(5, len(labels) * 0.7)))
     positions = list(range(len(labels)))
-    bars = ax.barh(positions, values, color="#2196F3", alpha=0.82)
+    bars = ax.barh(positions, values, color=colors, alpha=0.85)
     ax.set_yticks(positions)
-    ax.set_yticklabels(labels, fontsize=9)
-    ax.set_xlabel("Attack Success Rate", fontsize=11)
-    ax.set_title("Tactic Win Rate — RL Bandit", fontsize=13, fontweight="bold")
-    ax.set_xlim(0, 1.1)
+    ax.set_yticklabels(labels, fontsize=10)
+    ax.set_xlabel("Attack Success Rate (%)", fontsize=11)
+    ax.set_title("Tactic Win Rate — RL Bandit (all training)", fontsize=13, fontweight="bold")
+    max_val = max(values) if values else 1.0
+    ax.set_xlim(0, max_val * 1.3)
     for bar, ann in zip(bars, annotations):
-        ax.text(bar.get_width() + 0.015, bar.get_y() + bar.get_height() / 2,
+        ax.text(bar.get_width() + max_val * 0.02,
+                bar.get_y() + bar.get_height() / 2,
                 ann, ha="left", va="center", fontsize=8)
     ax.grid(axis="x", alpha=0.3)
+
+    # Family legend
+    seen: dict[str, str] = {}
+    for lbl, col in zip(labels, colors):
+        family = TACTIC_FAMILY_LABEL.get(lbl, "")
+        if family and family not in seen:
+            seen[family] = col
+    handles = [plt.Rectangle((0, 0), 1, 1, color=c, alpha=0.85) for c in seen.values()]
+    ax.legend(handles, list(seen.keys()), loc="lower right", fontsize=8, title="Family")
+
     return _save_figure(fig, output_path)
 
 
@@ -505,26 +625,38 @@ def generate_plots(aggregation: dict, output_dir: str) -> dict:
         for arm_id, average_reward in (row.get("average_reward_by_arm") or {}).items():
             reward_totals[str(arm_id)].append(float(average_reward))
 
+    pull_items = [
+        {"arm": _clean_tactic_name(arm_id), "pulls": pulls}
+        for arm_id, pulls in sorted(pull_totals.items(), key=lambda item: item[1], reverse=True)
+    ]
+    pull_colors = [TACTIC_FAMILY_COLORS.get(item["arm"], "#2196F3") for item in pull_items]
     arm_pull_counts = _plot_single_bar(
-        [{"arm": arm_id, "pulls": pulls} for arm_id, pulls in sorted(pull_totals.items(), key=lambda item: item[1], reverse=True)],
+        pull_items,
         label_field="arm",
         value_field="pulls",
-        title="Arm Pull Counts",
+        title="Arm Pull Counts — RL Bandit (all training)",
         ylabel="Pull count",
         output_path=output_path / "arm_pull_counts.png",
         horizontal=True,
+        item_colors=pull_colors,
     )
     if arm_pull_counts:
         generated_files.append(arm_pull_counts)
 
+    reward_items = [
+        {"arm": _clean_tactic_name(arm_id), "average_reward": _mean(values) or 0.0}
+        for arm_id, values in sorted(reward_totals.items(), key=lambda item: _mean(item[1]) or 0.0, reverse=True)
+    ]
+    reward_colors = [TACTIC_FAMILY_COLORS.get(item["arm"], "#2196F3") for item in reward_items]
     average_reward_by_arm = _plot_single_bar(
-        [{"arm": arm_id, "average_reward": _mean(values) or 0.0} for arm_id, values in sorted(reward_totals.items(), key=lambda item: _mean(item[1]) or 0.0, reverse=True)],
+        reward_items,
         label_field="arm",
         value_field="average_reward",
-        title="Average Reward by Arm",
+        title="Average Reward by Arm — RL Bandit (all training)",
         ylabel="Average reward",
         output_path=output_path / "average_reward_by_arm.png",
         horizontal=True,
+        item_colors=reward_colors,
     )
     if average_reward_by_arm:
         generated_files.append(average_reward_by_arm)
@@ -542,10 +674,9 @@ def generate_plots(aggregation: dict, output_dir: str) -> dict:
         preference_plot = _plot_time_series(
             group,
             series_field="pull_share",
-            title=f"Arm Preference Over Time - {benchmark} / {policy_mode}",
-            ylabel="Share of pulls",
+            title=f"Cumulative Arm Pull Share — {benchmark.upper()} / {experiment_split}",
+            ylabel="Cumulative pull share",
             output_path=preference_path,
-            top_n=5,
         )
         if preference_plot:
             generated_files.append(preference_plot)
@@ -564,20 +695,35 @@ def generate_plots(aggregation: dict, output_dir: str) -> dict:
             bandit_path = output_path / f"rl_bandit_evolution_{suffix}.png"
             runs = group.get("runs") or []
             if len(runs) >= 2:
-                fig, ax = plt.subplots(figsize=(10, 6))
+                from matplotlib.ticker import MaxNLocator
+
                 x_positions = list(range(1, len(runs) + 1))
                 y_attack = [float(run.get("attack_success_rate") or 0.0) for run in runs]
-                y_confidence = [float(run.get("average_llm_confidence") or 0.0) for run in runs]
-                y_syntax = [float(run.get("syntax_invalid_rate") or 0.0) for run in runs]
-                ax.plot(x_positions, y_attack, marker="o", label="attack_success_rate")
-                ax.plot(x_positions, y_confidence, marker="o", label="average_llm_confidence")
-                ax.plot(x_positions, y_syntax, marker="o", label="syntax_invalid_rate")
-                ax.set_title(f"RL Bandit Evolution - {benchmark} / {policy_mode}")
-                ax.set_xlabel("Run order")
-                ax.set_ylabel("Rate")
-                ax.set_xticks(x_positions)
-                ax.set_xticklabels([str(index) for index in x_positions])
-                ax.legend(loc="best")
+                window = min(50, max(10, len(runs) // 15))
+
+                def _rolling(vals: list[float], w: int) -> list[float]:
+                    return [
+                        sum(vals[max(0, i - w + 1): i + 1]) / (i - max(0, i - w + 1) + 1)
+                        for i in range(len(vals))
+                    ]
+
+                overall_mean = sum(y_attack) / len(y_attack)
+                fig, ax = plt.subplots(figsize=(11, 5))
+                ax.scatter(x_positions, y_attack, alpha=0.12, s=6, color="#90CAF9", zorder=1)
+                ax.plot(x_positions, _rolling(y_attack, window),
+                        color="#2196F3", linewidth=2,
+                        label=f"ASR rolling mean (w={window})", zorder=2)
+                ax.axhline(overall_mean, color="#555", linestyle="--", linewidth=1,
+                           label=f"Overall mean = {overall_mean:.2f}", zorder=3)
+                ax.xaxis.set_major_locator(MaxNLocator(nbins=15, integer=True))
+                ax.set_title(
+                    f"RL Bandit Training ASR — {benchmark.upper()} ({experiment_split})",
+                    fontsize=13, fontweight="bold",
+                )
+                ax.set_xlabel("Training problem", fontsize=11)
+                ax.set_ylabel("Attack Success Rate", fontsize=11)
+                ax.set_ylim(0, 1.05)
+                ax.legend(fontsize=9)
                 ax.grid(alpha=0.25)
                 saved = _save_figure(fig, bandit_path)
                 generated_files.append(saved)
@@ -597,6 +743,7 @@ def generate_plots(aggregation: dict, output_dir: str) -> dict:
     policy_test = _plot_policy_comparison_test(
         grouped_summary,
         output_path / "policy_comparison_test.png",
+        run_rows=run_rows,
     )
     if policy_test:
         generated_files.append(policy_test)
