@@ -28,8 +28,8 @@ if [[ -n "$ENV_FILE" ]]; then
 fi
 
 MODEL="${MODEL:-ollama/llama3.1:8b}"
-JUDGE_MODEL="${JUDGE_MODEL:-$MODEL}"
-SELECTOR_MODEL="${SELECTOR_MODEL:-$JUDGE_MODEL}"
+TARGET_MODEL="${TARGET_MODEL:-ollama/qwen2.5-coder:7b}"
+SELECTOR_MODEL="${SELECTOR_MODEL:-$MODEL}"
 BENCHMARK="mbpp"
 MAX_ITER="${MAX_ITER:-3}"
 LIMIT="${LIMIT:-5}"
@@ -53,7 +53,7 @@ done
 echo "Running adversarial_code_llm preset"
 echo "  BENCHMARK=$BENCHMARK"
 echo "  MODEL=$MODEL"
-echo "  JUDGE_MODEL=$JUDGE_MODEL"
+echo "  TARGET_MODEL=$TARGET_MODEL"
 echo "  SELECTOR_MODEL=$SELECTOR_MODEL"
 echo "  MAX_ITER=$MAX_ITER"
 echo "  LIMIT=$LIMIT"
@@ -68,7 +68,7 @@ inspect eval \
     -T benchmark="$BENCHMARK" \
     -T mutation_strategy=react \
     -T use_llm_judge=True \
-    -T judge_model="$JUDGE_MODEL" \
+    -T target_model="$TARGET_MODEL" \
     -T selector_model="$SELECTOR_MODEL" \
     -T max_iterations="$MAX_ITER" \
     --max-samples "$MAX_SAMPLES" \

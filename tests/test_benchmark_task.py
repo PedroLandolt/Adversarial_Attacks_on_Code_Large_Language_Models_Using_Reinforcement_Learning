@@ -33,10 +33,12 @@ def _install_stub_modules() -> None:
     model_mod = types.ModuleType("inspect_ai.model")
 
     class ChatMessageSystem:
+        role = "system"
         def __init__(self, content):
             self.content = content
 
     class ChatMessageUser:
+        role = "user"
         def __init__(self, content):
             self.content = content
 
@@ -66,10 +68,19 @@ def _install_stub_modules() -> None:
 
     dataset_mod = types.ModuleType("inspect_ai.dataset")
     dataset_mod.Dataset = object
+    dataset_mod.MemoryDataset = list
+    dataset_mod.Sample = lambda **kwargs: SimpleNamespace(**kwargs)
     sys.modules["inspect_ai.dataset"] = dataset_mod
 
     inspect_evals = types.ModuleType("inspect_evals")
     sys.modules["inspect_evals"] = inspect_evals
+
+    evals_utils = types.ModuleType("inspect_evals.utils")
+    sys.modules["inspect_evals.utils"] = evals_utils
+
+    evals_hf = types.ModuleType("inspect_evals.utils.huggingface")
+    evals_hf.hf_dataset = lambda *args, **kwargs: []
+    sys.modules["inspect_evals.utils.huggingface"] = evals_hf
 
     mbpp_mod = types.ModuleType("inspect_evals.mbpp")
 
@@ -309,7 +320,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                 mutation_strategy="react",
                 policy_mode="random_choice",
                 use_llm_judge=True,
-                judge_model="same-backend",
+                target_model="same-backend",
                 selector_model="same-backend",
                 max_iterations=1,
             )
@@ -368,7 +379,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                 mutation_strategy="react",
                 policy_mode="random_choice",
                 use_llm_judge=True,
-                judge_model="same-backend",
+                target_model="same-backend",
                 selector_model="same-backend",
                 max_iterations=1,
             )
@@ -450,7 +461,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                                 policy_mode=policy_mode,
                                 experiment_mode="iterative",
                                 use_llm_judge=True,
-                                judge_model="same-backend",
+                                target_model="same-backend",
                                 selector_model="same-backend",
                                 max_iterations=max_iterations,
                                 results_dir=results_dir,
@@ -462,7 +473,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                         policy_mode=policy_mode,
                         experiment_mode="iterative",
                         use_llm_judge=True,
-                        judge_model="same-backend",
+                        target_model="same-backend",
                         selector_model="same-backend",
                         max_iterations=max_iterations,
                         results_dir=results_dir,
@@ -583,7 +594,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                         selector_use_cot=enabled,
                         experiment_mode="iterative",
                         use_llm_judge=True,
-                        judge_model="same-backend",
+                        target_model="same-backend",
                         selector_model="same-backend",
                         max_iterations=1,
                         results_dir=results_dir,
@@ -723,7 +734,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                     bandit_weights_path="weights/mbpp_ucb1.json",
                     bandit_freeze_weights=True,
                     use_llm_judge=True,
-                    judge_model="same-backend",
+                    target_model="same-backend",
                     selector_model="same-backend",
                     max_iterations=1,
                     results_dir=results_dir,
@@ -948,7 +959,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
             task = benchmark_module.adversarial_code_llm(
                 mutation_strategy="react",
                 use_llm_judge=True,
-                judge_model="same-backend",
+                target_model="same-backend",
                 selector_model="same-backend",
                 max_iterations=1,
             )
@@ -1005,7 +1016,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                 mutation_strategy="react",
                 policy_mode="agent_based_decision",
                 use_llm_judge=True,
-                judge_model="same-backend",
+                target_model="same-backend",
                 selector_model="same-backend",
                 max_iterations=1,
             )
@@ -1056,7 +1067,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
             task = benchmark_module.adversarial_code_llm(
                 mutation_strategy="react",
                 use_llm_judge=True,
-                judge_model="same-backend",
+                target_model="same-backend",
                 selector_model="same-backend",
                 max_iterations=3,
             )
@@ -1080,7 +1091,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
             "stop_reason",
             "total_iterations",
             "selector_model",
-            "judge_model",
+            "target_model",
         ):
             self.assertIn(required_key, metadata)
 
@@ -1119,7 +1130,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                 mutation_strategy="react",
                 experiment_mode="one_shot",
                 use_llm_judge=True,
-                judge_model="same-backend",
+                target_model="same-backend",
                 selector_model="same-backend",
                 max_iterations=3,
             )
@@ -1170,7 +1181,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                 mutation_strategy="react",
                 experiment_mode="iterative",
                 use_llm_judge=True,
-                judge_model="same-backend",
+                target_model="same-backend",
                 selector_model="same-backend",
                 max_iterations=2,
             )
@@ -1235,7 +1246,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
             task = benchmark_module.adversarial_code_llm(
                 mutation_strategy="react",
                 use_llm_judge=True,
-                judge_model="same-backend",
+                target_model="same-backend",
                 selector_model="same-backend",
                 max_iterations=3,
             )
@@ -1302,7 +1313,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                 mutation_strategy="react",
                 policy_mode="rl_bandit",
                 use_llm_judge=True,
-                judge_model="same-backend",
+                target_model="same-backend",
                 selector_model="same-backend",
                 max_iterations=1,
             )
@@ -1324,7 +1335,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
         temp_dir = Path.cwd() / ".tmp_test_results" / uuid4().hex
         results_dir = str(temp_dir / "results")
         try:
-            target_model = FakeModelName("ollama/llama3.1:8b")
+            selector_model_value = FakeModelName("ollama/llama3.1:8b")
 
             mbpp_sandbox = FakeSandbox()
             mbpp_task = benchmark_module.adversarial_code_llm(
@@ -1333,7 +1344,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                 use_llm_judge=False,
                 experiment_mode="one_shot",
                 results_dir=results_dir,
-                target_model=target_model,
+                selector_model=selector_model_value,
             )
             mbpp_state = DummyState(
                 prompt="Write add_one.",
@@ -1362,7 +1373,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                 use_llm_judge=False,
                 experiment_mode="iterative",
                 results_dir=results_dir,
-                target_model=target_model,
+                selector_model=selector_model_value,
             )
             humaneval_state = DummyState(
                 prompt="Write increment.",
@@ -1405,7 +1416,7 @@ class BenchmarkTaskTests(unittest.IsolatedAsyncioTestCase):
                 {"one_shot", "iterative"},
             )
             self.assertEqual(
-                {config["target_model"] for config in loaded_configs},
+                {config["code_generation_model"] for config in loaded_configs},
                 {"ollama/llama3.1:8b"},
             )
             self.assertTrue(all(summary["num_samples"] == 1 for summary in loaded_summaries))

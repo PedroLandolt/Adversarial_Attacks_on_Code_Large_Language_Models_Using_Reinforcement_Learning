@@ -1,0 +1,18 @@
+{
+  "benchmark": "mbpp",
+  "is_partial_run": false,
+  "total_attempted": 974,
+  "saved": 799,
+  "skipped_correct": 40,
+  "skipped_nocode": 0,
+  "skipped_judge_pass": 135,
+  "yield_rate": 0.8203,
+  "baseline_judge_pass_rate": 0.1445,
+  "generation_model": "llama3.1:8b",
+  "generation_temperature": 0.5,
+  "judge_model": "qwen2.5-coder:7b",
+  "generated_at": "2026-06-05T17:34:53.348608+00:00",
+  "manually_injected": 39,
+  "saved_including_manual": 838,
+  "last_manual_injection": "2026-06-07T15:44:15.503558+00:00"
+}

@@ -156,7 +156,7 @@ Prefer one-shot validation when testing a specific attack in isolation. Use it t
 
 ## Data and weights
 
-Keep the pipeline open-source friendly. If datasets or learned weights are published, plan for Hugging Face storage so they can be updated over time without changing the core benchmark semantics.
+Published dataset: `PedroLandolt/adversarial-code-buggy` on HuggingFace — 940 records (790 MBPP + 150 HumanEval), uploaded as `data/train.jsonl`. Local copy at `datasets/adversarial-code-buggy.jsonl`. Schema: `source`, `task_id`, `problem_text`, `buggy_code`, `original_code`, `test_list` (MBPP), `test_harness` + `entry_point` (HumanEval), `baseline_judge_decision`, `baseline_judge_confidence`. Rebuild and re-upload: `python V3/utils/upload_to_hub.py` (requires `HF_TOKEN`).
 
 ## How to run
 
@@ -235,10 +235,14 @@ Weight checkpoints are saved per epoch (`weights/mbpp_ucb1_epoch_001.json`, …)
 
 ### Benchmark split sizes (70/15/15)
 
-| Benchmark  | Total | Train (1–N) | Val range | Test range |
-| ---------- | ----- | ----------- | --------- | ---------- |
-| MBPP       | 257   | 179         | 180–218   | 219–257    |
-| HumanEval  | 164   | 115         | 116–139   | 140–164    |
+MBPP split sizes are computed dynamically from the actual dataset count at runtime
+(`get_benchmark_size('mbpp')` in `benchmark_loader.py`). Current full-config total: **974 samples**
+(374 train + 90 validation + 500 test + 10 prompt from `google-research-datasets/mbpp` `full` config).
+
+| Benchmark  | Total        | Train (~70%) | Val (~15%)   | Test (~15%)  |
+| ---------- | ------------ | ------------ | ------------ | ------------ |
+| MBPP       | 974 (dynamic)| 681          | 146 (682–827)| 147 (828–974)|
+| HumanEval  | 164          | 115          | 116–139      | 140–164      |
 
 ## Running tests
 
@@ -366,6 +370,21 @@ Writing guidelines:
 - prefer concrete observations over vague claims.
 
 Every generated result should be easy to export into tables for the paper. Every experiment must be reproducible.
+
+## Context management
+
+Claude Code compacts conversation context automatically around 80% capacity.
+At ~90% capacity (when further compaction won't help), write a handoff file at
+`CONTEXT_HANDOFF.md` in the current working directory with:
+1. Task currently in progress and what step you are on
+2. Completed steps this session
+3. Pending steps not yet started
+4. Key files modified
+5. Open decisions or blockers
+
+Then tell the user: "Context is near limit — please start a new conversation and
+open CONTEXT_HANDOFF.md to continue." Delete the file once the new conversation
+picks it up.
 
 ## Living notes
 

@@ -1,0 +1,39 @@
+{
+  "generated_at": "2026-06-08T02:56:04.421304",
+  "run_count": 983,
+  "group_count": 2,
+  "plot_count": 11,
+  "plots": [
+    "plots\\20260608_025505\\comparison\\attack_success_rate_by_policy_mode.png",
+    "plots\\20260608_025505\\comparison\\success_by_benchmark.png",
+    "plots\\20260608_025505\\comparison\\syntax_invalid_rate_by_policy_mode.png",
+    "plots\\20260608_025505\\comparison\\one_shot_vs_iterative_comparison.png",
+    "plots\\20260608_025505\\comparison\\train_validation_test_comparison.png",
+    "plots\\20260608_025505\\comparison\\iterations_to_success_distribution.png",
+    "plots\\20260608_025505\\comparison\\arm_pull_counts.png",
+    "plots\\20260608_025505\\comparison\\average_reward_by_arm.png",
+    "plots\\20260608_025505\\comparison\\arm_preference_over_time_adversarial_code_buggy_random_choice_iterative_test_none.png",
+    "plots\\20260608_025505\\comparison\\policy_comparison_test.png",
+    "plots\\20260608_025505\\comparison\\success_breakdown_baseline_vs_tactic.png"
+  ],
+  "group_artifacts": [
+    {
+      "benchmark": "adversarial_code_buggy",
+      "policy_mode": "random_choice",
+      "experiment_mode": "iterative",
+      "experiment_split": "test",
+      "bandit_algorithm": "none",
+      "figure": "plots\\20260608_025505\\comparison\\arm_preference_over_time_adversarial_code_buggy_random_choice_iterative_test_none.png"
+    }
+  ],
+  "source_summary": {
+    "results_dir": "results",
+    "run_count": 983,
+    "benchmarks": [
+      "adversarial_code_buggy"
+    ],
+    "policy_modes": [
+      "random_choice"
+    ]
+  }
+}

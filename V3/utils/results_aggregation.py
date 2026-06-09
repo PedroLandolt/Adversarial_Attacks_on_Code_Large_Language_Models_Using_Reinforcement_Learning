@@ -55,6 +55,8 @@ def _group_key(row: dict) -> tuple:
         row.get("experiment_mode"),
         row.get("experiment_split"),
         row.get("bandit_algorithm"),
+        row.get("selector_model"),
+        row.get("target_model"),
     )
 
 
@@ -95,6 +97,10 @@ def aggregate_persisted_runs(
                 "experiment_mode": run_summary.get("experiment_mode") or run_config.get("experiment_mode"),
                 "experiment_split": run_summary.get("experiment_split") or run_config.get("experiment_split"),
                 "split_definition": run_summary.get("split_definition") or run_config.get("split_definition"),
+                "target_model": str(run_config.get("target_model") or ""),
+                "selector_model": str(run_config.get("selector_model") or ""),
+                "code_generation_model": run_config.get("code_generation_model"),
+                "max_iterations": run_config.get("max_iterations"),
                 "selector_cot_enabled": _to_bool(
                     run_summary.get("selector_cot_enabled")
                     if run_summary.get("selector_cot_enabled") is not None
@@ -188,7 +194,7 @@ def aggregate_persisted_runs(
 
     grouped_summary = []
     for key, acc in grouped_acc.items():
-        benchmark, policy_mode, experiment_mode, experiment_split, bandit_algorithm = key
+        benchmark, policy_mode, experiment_mode, experiment_split, bandit_algorithm, selector_model, target_model = key
         grouped_summary.append(
             {
                 "benchmark": benchmark,
@@ -196,6 +202,8 @@ def aggregate_persisted_runs(
                 "experiment_mode": experiment_mode,
                 "experiment_split": experiment_split,
                 "bandit_algorithm": bandit_algorithm,
+                "selector_model": selector_model,
+                "target_model": target_model,
                 "run_count": acc["runs"],
                 "mean_attack_success_rate": _average(acc["attack_success_rate"]),
                 "mean_syntax_invalid_rate": _average(acc["syntax_invalid_rate"]),
@@ -222,7 +230,7 @@ def aggregate_persisted_runs(
 
     evolution_by_group = []
     for key, entries in evolution_acc.items():
-        benchmark, policy_mode, experiment_mode, experiment_split, bandit_algorithm = key
+        benchmark, policy_mode, experiment_mode, experiment_split, bandit_algorithm, selector_model, target_model = key
         entries_sorted = sorted(entries, key=lambda item: item.get("timestamp") or "")
         evolution_by_group.append(
             {
@@ -231,6 +239,8 @@ def aggregate_persisted_runs(
                 "experiment_mode": experiment_mode,
                 "experiment_split": experiment_split,
                 "bandit_algorithm": bandit_algorithm,
+                "selector_model": selector_model,
+                "target_model": target_model,
                 "runs": entries_sorted,
             }
         )
@@ -298,6 +308,10 @@ def write_aggregation_artifacts(*, aggregation: dict, output_dir: str) -> dict:
         "experiment_mode",
         "experiment_split",
         "split_definition",
+        "target_model",
+        "selector_model",
+        "code_generation_model",
+        "max_iterations",
         "selector_cot_enabled",
         "bandit_algorithm",
         "bandit_freeze_weights_effective",
@@ -317,9 +331,26 @@ def write_aggregation_artifacts(*, aggregation: dict, output_dir: str) -> dict:
         for row in run_rows:
             writer.writerow({field: row.get(field) for field in csv_fields})
 
+    # Comparison summary — one row per (benchmark, selector_model, target_model, policy_mode,
+    # bandit_algorithm, experiment_split) with mean ASR. Ready for paper tables.
+    comparison_csv_path = output_path / "comparison_summary.csv"
+    comparison_fields = [
+        "benchmark", "selector_model", "target_model", "policy_mode",
+        "bandit_algorithm", "experiment_split", "run_count",
+        "mean_attack_success_rate", "mean_syntax_invalid_rate",
+        "mean_invalid_attempt_rate", "mean_iterations_to_success",
+        "mean_llm_confidence",
+    ]
+    with comparison_csv_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=comparison_fields)
+        writer.writeheader()
+        for row in aggregation.get("grouped_summary", []):
+            writer.writerow({field: row.get(field) for field in comparison_fields})
+
     return {
         "runs_json": str(runs_json_path),
         "grouped_summary_json": str(grouped_json_path),
         "evolution_json": str(evolution_json_path),
         "runs_csv": str(runs_csv_path),
+        "comparison_summary_csv": str(comparison_csv_path),
     }

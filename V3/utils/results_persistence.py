@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from utils.reward_accounting import (
     REWARD_RULE_VERSION,
+    compute_arm_entropy,
     compute_attempt_reward,
     normalize_arm_id,
     summarize_arm_accounting,
@@ -95,6 +96,9 @@ def _extract_attempt_record(
         "bandit_algorithm": selector_output.get("bandit_algorithm"),
         "bandit_state": selector_output.get("bandit_state"),
         "bandit_state_post_update": record.get("bandit_state_post_update"),
+        "arm_entropy_at_step": compute_arm_entropy(
+            (selector_output.get("bandit_state") or {}).get("pull_counts") or {}
+        ),
         "selector_reasoning": selector_output.get("selector_reasoning"),
         "stop_reason": record.get("stop_reason"),
         "raw_completion_summary": _artifact_summary(record.get("raw_completion")),
@@ -176,6 +180,15 @@ def _compute_summary(metadata: dict, attempt_rows: list[dict], run_id: str) -> d
         for row in attempt_rows
     )
 
+    # Arm entropy curve for rl_bandit runs: one value per tactic attempt.
+    # Entropy (nats) of the pull distribution at each step.
+    # High = exploring broadly; low = exploiting best arm. Used to detect convergence.
+    arm_entropy_values = [
+        row["arm_entropy_at_step"]
+        for row in attempt_rows
+        if row.get("arm_entropy_at_step") is not None
+    ]
+
     successful_iteration = metadata.get("successful_iteration")
 
     return {
@@ -194,6 +207,8 @@ def _compute_summary(metadata: dict, attempt_rows: list[dict], run_id: str) -> d
         "failed_samples": 0 if metadata.get("attack_succeeded") else 1,
         "baseline_success": baseline_success,
         "tactic_driven_success": tactic_driven_success,
+        "baseline_attack_success_rate": 1.0 if baseline_success else 0.0,
+        "tactic_driven_attack_success_rate": 1.0 if tactic_driven_success else 0.0,
         "syntax_invalid_rate": 1.0 if syntax_invalid_present else 0.0,
         "invalid_attempt_rate": (
             len(invalid_attempts) / len(attempt_rows) if attempt_rows else 0.0
@@ -210,6 +225,8 @@ def _compute_summary(metadata: dict, attempt_rows: list[dict], run_id: str) -> d
         "cumulative_reward_by_arm": arm_accounting["cumulative_reward_by_arm"],
         "average_reward_by_arm": arm_accounting["average_reward_by_arm"],
         "stop_reason_counts": dict(stop_reason_counts),
+        "arm_entropy_curve": arm_entropy_values if arm_entropy_values else None,
+        "arm_entropy_final": arm_entropy_values[-1] if arm_entropy_values else None,
     }
 
 
@@ -226,8 +243,8 @@ def persist_run_results(
     selector_cot_enabled: bool | None,
     bandit_freeze_weights_effective: bool | None,
     experiment_mode: str,
+    code_generation_model: str | None,
     target_model: str | None,
-    judge_model: str | None,
     selector_model: str | None,
     max_iterations: int,
     sample_id: str | None = None,
@@ -237,10 +254,10 @@ def persist_run_results(
     git_commit: str | None = None,
 ) -> dict:
     timestamp = datetime.now().astimezone()
+    code_generation_model = _normalize_model_value(code_generation_model)
     target_model = _normalize_model_value(target_model)
-    judge_model = _normalize_model_value(judge_model)
     selector_model = _normalize_model_value(selector_model)
-    model_tag = _sanitize_model_tag(target_model or judge_model or selector_model)
+    model_tag = _sanitize_model_tag(selector_model or target_model or code_generation_model)
     run_id = (
         f"{timestamp.strftime('%Y-%m-%d_%H-%M-%S')}_"
         f"{benchmark}_{policy_mode}_{model_tag}_{uuid4().hex[:8]}"
@@ -261,8 +278,8 @@ def persist_run_results(
         "selector_cot_enabled": selector_cot_enabled,
         "bandit_freeze_weights_effective": bandit_freeze_weights_effective,
         "experiment_mode": experiment_mode,
+        "code_generation_model": code_generation_model,
         "target_model": target_model,
-        "judge_model": judge_model,
         "selector_model": selector_model,
         "max_iterations": max_iterations,
         "limit": limit,

@@ -1,9 +1,24 @@
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 
 
 REWARD_RULE_VERSION = "benchmark_v1"
+
+
+def compute_arm_entropy(pull_counts: dict[str, int]) -> float | None:
+    """Shannon entropy (nats) of the arm pull distribution.
+
+    Returns None if no pulls have been made yet (undefined).
+    Maximum entropy for N arms = log(N); entropy approaches 0 as one arm dominates.
+    Use this to track exploitation settling in: high entropy = exploring, low = exploiting.
+    """
+    total = sum(pull_counts.values())
+    if total == 0:
+        return None
+    probs = [count / total for count in pull_counts.values() if count > 0]
+    return -sum(p * math.log(p) for p in probs)
 
 
 def normalize_arm_id(

@@ -63,7 +63,7 @@ from inspect_ai.solver import TaskState, solver
 from inspect_ai.util import sandbox
 from inspect_evals.mbpp import mbpp
 from judge.llm_judge import LLMJudge
-from judge.red_teaming_tactics import apply_tactic, build_tactic_generation_prompt, generate_tactic_artifact
+from judge.red_teaming_tactics import apply_tactic, generate_tactic_artifact, get_code_generation_prompt
 from judge.test_judge import test_judge
 from utils.benchmark_loader import (build_verification_program,
                                     extract_benchmark_spec,
@@ -71,6 +71,15 @@ from utils.benchmark_loader import (build_verification_program,
 from utils.code_extraction import extract_python_code
 from utils.results_persistence import persist_run_results
 from utils.syntax_validator import validate_python_syntax
+
+# Benchmarks whose buggy code is already verified — Docker sandbox not needed.
+_PREGENERATED_BENCHMARKS: frozenset[str] = frozenset({
+    "adversarial_code_buggy",
+    "mbpp_pregenerated",
+    "humaneval_pregenerated",
+    "synthesized_wbo",
+    "cubert_wbo",
+})
 
 
 def _normalize_model_backend(model_name: str | None) -> str | None:
@@ -97,13 +106,12 @@ def adversarial_code_llm(
     smoke_test: bool = False,
     debug_force_invalid_syntax: bool = False,  # Internal validation-only hook.
     results_dir: str = "results",
-    target_model: str | None = None,
     mutation_strategy: str = "random",  # "random", "sequential", "react"
     use_misleading_comments: bool = True,
     use_variable_renaming: bool = True,
     use_instruction_perturbation: bool = False,
     use_llm_judge: bool = False,
-    judge_model: str = "ollama/llama3.1:8b",
+    target_model: str = "ollama/llama3.1:8b",
     selector_model: str | None = None,
     red_teaming_tactic: str = None,  # "injection" | "output" | "semantic" | "cot" | None
     forced_tactic: str | None = None,  # Pin a specific tactic ID/family; bypasses selector in react mode.
@@ -135,9 +143,11 @@ def adversarial_code_llm(
         raise ValueError(
             "experiment_split must be one of: 'full', 'train', 'validation', 'test'."
         )
-    if policy_mode == "rl_bandit" and bandit_algorithm != "ucb1":
+    _SUPPORTED_BANDIT_ALGORITHMS = {"ucb1", "thompson", "klucb", "exp3"}
+    if policy_mode == "rl_bandit" and bandit_algorithm not in _SUPPORTED_BANDIT_ALGORITHMS:
         raise ValueError(
-            "policy_mode='rl_bandit' currently supports only bandit_algorithm='ucb1'."
+            f"bandit_algorithm='{bandit_algorithm}' is not supported. "
+            f"Choose one of: {sorted(_SUPPORTED_BANDIT_ALGORITHMS)}."
         )
 
     base_task = load_benchmark_task(benchmark, temperature=temperature)
@@ -152,7 +162,7 @@ def adversarial_code_llm(
     if use_instruction_perturbation:
         mutators.append(("instruction_perturbation", instruction_perturbation()))
 
-    judge_backend = _normalize_model_backend(judge_model)
+    judge_backend = _normalize_model_backend(target_model)
     selector_backend = _normalize_model_backend(selector_model) or judge_backend
     shared_judge_selector_model = None
     if (
@@ -204,6 +214,14 @@ def adversarial_code_llm(
     def iterative_attack():
         async def solve(state: TaskState, generate_fn):
             attempts = []
+            # Prepend a tactic-independent system message that steers the target LLM
+            # to produce syntactically valid Python with a deliberate semantic error.
+            # This applies to every code generation call (baseline and all iterations).
+            # Tactic selection influences only the judge-facing attack artifact (Step 3),
+            # not the code produced here (Step 1).
+            _code_gen_prompt = get_code_generation_prompt()
+            if _code_gen_prompt:
+                state.messages.insert(0, ChatMessageSystem(content=_code_gen_prompt))
             original_messages = deepcopy(state.messages)
             original_sample_metadata = deepcopy(getattr(state, "metadata", {}) or {})
             effective_max_iterations = (
@@ -633,8 +651,8 @@ def adversarial_code_llm(
                     "successful_iteration": successful_iteration_value,
                     "total_iterations": len(all_attempts),
                     "stop_reason": stop_reason_value,
-                    "judge_model": judge_model,
-                    "selector_model": selector_model if selector_model else judge_model,
+                    "target_model": target_model,
+                    "selector_model": selector_model,
                     "policy_mode": policy_mode,
                     "experiment_split": experiment_split,
                     "split_definition": split_definition,
@@ -658,19 +676,9 @@ def adversarial_code_llm(
                 }
 
             def persist_metadata(metadata: dict) -> dict:
-                effective_target_model = (
-                    target_model
-                    or getattr(state, "model", None)
-                    or getattr(state, "model_name", None)
-                    or original_sample_metadata.get("target_model")
-                    or original_sample_metadata.get("model")
-                    or original_sample_metadata.get("model_name")
-                    or os.getenv("MODEL")
-                )
-                effective_target_model = (
-                    str(effective_target_model)
-                    if effective_target_model is not None
-                    else None
+                code_generation_model = (
+                    None if benchmark in _PREGENERATED_BENCHMARKS
+                    else selector_model
                 )
                 merged_metadata = {**original_sample_metadata, **metadata}
                 if benchmark_spec.benchmark_name == "humaneval":
@@ -711,9 +719,9 @@ def adversarial_code_llm(
                         else None
                     ),
                     experiment_mode=experiment_mode,
-                    target_model=effective_target_model,
-                    judge_model=judge_model,
-                    selector_model=selector_model if selector_model else judge_model,
+                    code_generation_model=code_generation_model,
+                    target_model=target_model,
+                    selector_model=selector_model,
                     max_iterations=max_iterations,
                     sample_id=(
                         original_sample_metadata.get("sample_id")
@@ -737,60 +745,78 @@ def adversarial_code_llm(
             baseline_syntax_result = None
 
             try:
-                baseline_gen_start = time.perf_counter()
-                llm_call_counts["baseline_generation"] += 1
-                llm_call_counts["total"] += 1
-                baseline_response = await generate_fn(state)
-                timings["baseline_generation_seconds"] += (
-                    time.perf_counter() - baseline_gen_start
-                )
-
-                if hasattr(baseline_response, "output"):
-                    if hasattr(baseline_response.output, "completion"):
-                        baseline_output = baseline_response.output.completion
-                    else:
-                        baseline_output = str(baseline_response.output)
+                pregenerated_code = original_sample_metadata.get("pregenerated_buggy_code")
+                if pregenerated_code:
+                    # Pre-generated benchmark (e.g. wrong_binary_operator):
+                    # skip LLM code generation (Step 1) and Docker test execution (Step 2).
+                    # The dataset builder already verified that these tests fail.
+                    baseline_artifact_bundle = await build_artifact_bundle(pregenerated_code)
+                    final_artifact_bundle = baseline_artifact_bundle
+                    baseline_syntax_result = validate_python_syntax(
+                        baseline_artifact_bundle["executable_code"]
+                    )
+                    baseline_artifact_bundle["syntax_result"] = baseline_syntax_result
+                    test_result = {
+                        "pass": False,
+                        "stdout": "",
+                        "stderr": "pregenerated_fail: operator substitution verified during dataset build",
+                    }
+                    test_decision = test_judge(test_result)
                 else:
-                    baseline_output = str(baseline_response)
-                if debug_force_invalid_syntax:
-                    # Internal validation-only hook for reproducible syntax-gate checks.
-                    baseline_output = "def broken(:\n    return 1\n"
-                baseline_artifact_bundle = await build_artifact_bundle(baseline_output)
-                final_artifact_bundle = baseline_artifact_bundle
-                baseline_syntax_result = validate_python_syntax(
-                    baseline_artifact_bundle["executable_code"]
-                )
-                baseline_artifact_bundle["syntax_result"] = baseline_syntax_result
-
-                if not baseline_syntax_result["syntax_valid"]:
-                    baseline_record = build_baseline_record(
-                        artifact_bundle=baseline_artifact_bundle,
-                        test_result=None,
-                        test_decision_obj=None,
-                        llm_decision_obj=None,
-                        stop_reason="baseline_invalid_syntax",
-                        error=baseline_syntax_result["syntax_error"],
-                        syntax_result=baseline_syntax_result,
+                    baseline_gen_start = time.perf_counter()
+                    llm_call_counts["baseline_generation"] += 1
+                    llm_call_counts["total"] += 1
+                    baseline_response = await generate_fn(state)
+                    timings["baseline_generation_seconds"] += (
+                        time.perf_counter() - baseline_gen_start
                     )
-                    state.metadata = persist_metadata(
-                        build_run_metadata(
-                            strategy_name=mutation_strategy,
-                            baseline_record=baseline_record,
-                            all_attempts=attempts,
-                            final_artifact_bundle=baseline_artifact_bundle,
-                            attack_succeeded_value=False,
-                            successful_iteration_value=None,
-                            stop_reason_value="baseline_invalid_syntax",
+
+                    if hasattr(baseline_response, "output"):
+                        if hasattr(baseline_response.output, "completion"):
+                            baseline_output = baseline_response.output.completion
+                        else:
+                            baseline_output = str(baseline_response.output)
+                    else:
+                        baseline_output = str(baseline_response)
+                    if debug_force_invalid_syntax:
+                        # Internal validation-only hook for reproducible syntax-gate checks.
+                        baseline_output = "def broken(:\n    return 1\n"
+                    baseline_artifact_bundle = await build_artifact_bundle(baseline_output)
+                    final_artifact_bundle = baseline_artifact_bundle
+                    baseline_syntax_result = validate_python_syntax(
+                        baseline_artifact_bundle["executable_code"]
+                    )
+                    baseline_artifact_bundle["syntax_result"] = baseline_syntax_result
+
+                    if not baseline_syntax_result["syntax_valid"]:
+                        baseline_record = build_baseline_record(
+                            artifact_bundle=baseline_artifact_bundle,
+                            test_result=None,
+                            test_decision_obj=None,
+                            llm_decision_obj=None,
+                            stop_reason="baseline_invalid_syntax",
+                            error=baseline_syntax_result["syntax_error"],
+                            syntax_result=baseline_syntax_result,
                         )
-                    )
-                    return state
+                        state.metadata = persist_metadata(
+                            build_run_metadata(
+                                strategy_name=mutation_strategy,
+                                baseline_record=baseline_record,
+                                all_attempts=attempts,
+                                final_artifact_bundle=baseline_artifact_bundle,
+                                attack_succeeded_value=False,
+                                successful_iteration_value=None,
+                                stop_reason_value="baseline_invalid_syntax",
+                            )
+                        )
+                        return state
 
-                # Deterministic execution remains the ground-truth benchmark signal.
-                test_result = await execute_benchmark_tests(
-                    baseline_artifact_bundle["executable_code"],
-                    benchmark_spec,
-                )
-                test_decision = test_judge(test_result)
+                    # Deterministic execution remains the ground-truth benchmark signal.
+                    test_result = await execute_benchmark_tests(
+                        baseline_artifact_bundle["executable_code"],
+                        benchmark_spec,
+                    )
+                    test_decision = test_judge(test_result)
 
                 # The LLM judge is the review target whose decision may diverge from tests.
                 if use_llm_judge:
@@ -1018,39 +1044,30 @@ def adversarial_code_llm(
                     """Create a fresh attempt, apply tactic, then evaluate judges."""
                     applied_tactic_name = normalize_tactic_name(tactic_name)
 
-                    # Each iteration starts from the original prompt so the selector
-                    # influences a fresh candidate instead of mutating hidden stale state.
-                    state.messages = deepcopy(original_messages)
-                    # Prepend a tactic-specific system message so the target LLM
-                    # produces syntax-safe Python with a deliberate, tactic-aligned
-                    # logical error, reducing both syntax failures and generation variance.
-                    _tactic_entry_for_gen = get_tactic_entry(
-                        ctx["selected_tactic_name"], environment="benchmark"
-                    )
-                    state.messages.insert(
-                        0,
-                        ChatMessageSystem(
-                            content=build_tactic_generation_prompt(
-                                _tactic_entry_for_gen.renderer_binding
-                            )
-                        ),
-                    )
-                    ctx["failure_stage"] = "generate_candidate"
-                    iteration_gen_start = time.perf_counter()
-                    llm_call_counts["iteration_generation"] += 1
-                    llm_call_counts["total"] += 1
-                    generated_state = await generate_fn(state)
-                    timings["iteration_generation_seconds"].append(
-                        time.perf_counter() - iteration_gen_start
-                    )
-
-                    if hasattr(generated_state, "output") and generated_state.output:
-                        if hasattr(generated_state.output, "completion"):
-                            raw_completion = generated_state.output.completion
-                        else:
-                            raw_completion = str(generated_state.output)
+                    if pregenerated_code:
+                        # Pre-generated benchmark: reuse the fixed buggy code at every
+                        # iteration.  Only the tactic wrapping (review_artifact) changes.
+                        raw_completion = pregenerated_code
                     else:
-                        raw_completion = "[No output generated]"
+                        # Each iteration starts from the original prompt so the selector
+                        # influences a fresh candidate instead of mutating hidden stale state.
+                        state.messages = deepcopy(original_messages)
+                        ctx["failure_stage"] = "generate_candidate"
+                        iteration_gen_start = time.perf_counter()
+                        llm_call_counts["iteration_generation"] += 1
+                        llm_call_counts["total"] += 1
+                        generated_state = await generate_fn(state)
+                        timings["iteration_generation_seconds"].append(
+                            time.perf_counter() - iteration_gen_start
+                        )
+
+                        if hasattr(generated_state, "output") and generated_state.output:
+                            if hasattr(generated_state.output, "completion"):
+                                raw_completion = generated_state.output.completion
+                            else:
+                                raw_completion = str(generated_state.output)
+                        else:
+                            raw_completion = "[No output generated]"
 
                     ctx["generated_code_before_tactic"] = extract_python_code(
                         raw_completion
@@ -1088,11 +1105,19 @@ def adversarial_code_llm(
                             True,
                         )
 
-                    ctx["failure_stage"] = "test_execution"
-                    test_result_iter = await execute_benchmark_tests(
-                        artifact_bundle["executable_code"],
-                        benchmark_spec,
-                    )
+                    if pregenerated_code:
+                        # Pregenerated dataset: bug already verified → always FAIL.
+                        test_result_iter = {
+                            "pass": False,
+                            "stdout": "",
+                            "stderr": "pregenerated_fail: verified during dataset build",
+                        }
+                    else:
+                        ctx["failure_stage"] = "test_execution"
+                        test_result_iter = await execute_benchmark_tests(
+                            artifact_bundle["executable_code"],
+                            benchmark_spec,
+                        )
                     next_test_decision = test_judge(test_result_iter)
                     ctx["failure_stage"] = "llm_judge"
                     iteration_llm_judge_start = time.perf_counter()
@@ -1935,11 +1960,14 @@ def adversarial_code_llm(
 
         return solve
 
+    _needs_sandbox = benchmark not in _PREGENERATED_BENCHMARKS
     return Task(
         dataset=base_task.dataset,
         solver=[iterative_attack()],
-        scorer=base_task.scorer,
-        sandbox="docker",
+        # Pregenerated benchmarks skip Docker entirely — suppress the mbpp/humaneval
+        # scorer that would try to call sandbox().exec() with no sandbox present.
+        scorer=base_task.scorer if _needs_sandbox else [],
+        sandbox="docker" if _needs_sandbox else None,
         epochs=1 if smoke_test else epochs,
     )
 
@@ -1948,7 +1976,7 @@ def adversarial_code_llm(
 def adversarial_gitea_react_attack(
     temperature: float = 0.3,
     max_iterations: int = 3,
-    judge_model: str = "ollama/llama3.1:8b",
+    target_model: str = "ollama/llama3.1:8b",
     selector_model: str | None = None,
     repo: str | None = None,
     base_branch: str = "main",
@@ -1962,7 +1990,7 @@ def adversarial_gitea_react_attack(
                              github_read_file, github_write_file)
 
     base_task = mbpp(temperature=temperature)
-    judge_backend = _normalize_model_backend(judge_model)
+    judge_backend = _normalize_model_backend(target_model)
     selector_backend = _normalize_model_backend(selector_model) or judge_backend
     selector_policy = ReactSelectorPolicy(selector_backend)
 
@@ -2239,7 +2267,7 @@ def adversarial_gitea_react_attack(
                 "attack_succeeded": attack_succeeded,
                 "total_iterations": len(attempts),
                 "stop_reason": stop_reason,
-                "judge_model": judge_model,
+                "target_model": target_model,
                 "selector_model": selector_backend,
                 "all_attempts": attempts,
             }

@@ -1,32 +1,33 @@
 # Adversarial Attacks on Code LLMs using Reinforcement Learning
 
-> **Conference alignment update — May 31 paper track**
+> **Scope update — 2026-06-08 (thesis track)**
 >
-> This document narrows the operational focus of the repository for the current paper deadline.
-> The thesis can remain broader, but the active implementation plan for now must prioritize the conference path below.
+> Full experiment matrix is running. Thesis scope is now broader than the original
+> conference paper. This document reflects the current active implementation.
 
 ---
 
 ## 1. Current active scope
 
-The active scope for the conference is:
+The active scope for the thesis experiments is:
 
-1. **MBPP** as a controlled judge-attack benchmark.
-2. **HumanEval** as a second benchmark under the same adapter contract.
+1. **adversarial_code_buggy** — Pedro's original dataset (982 records: 933 LLM-generated
+   + 49 hand-crafted). Loads from `datasets/adversarial-code-buggy.jsonl`.
+   Published at `PedroLandolt/adversarial-code-buggy` on HuggingFace.
+2. **cubert_wbo** — CuBERT Wrong Binary Operator dataset (10,000 records, capped at 1000
+   for experiments). Loads from `datasets/cubert_wbo.jsonl`.
 3. **Selector policy comparison** across:
-   - `random_choice`
-   - `agent_based_decision`
-   - `rl_bandit`
-4. **Offline experiment persistence and plotting**.
+   - `random_choice` (baseline)
+   - `agent_based_decision` (ReAct reasoning baseline)
+   - `rl_bandit` with `bandit_algorithm` in {`ucb1`, `thompson`, `klucb`, `exp3`}
+4. **Cross-model matrix**: 3 attacker models × 4 judge models (see §4 below).
+5. **Offline experiment persistence and plotting**.
 
-### Explicitly out of scope for the conference track
+### Out of scope
 
 - Gitea workflow experimentation
-- rewriting protected `V3/gitea/` files
-- sequential RL methods such as SARSA / Q-learning
-- full cross-environment generalization claims
-
-Gitea remains part of the broader thesis direction, but it is not part of the current conference execution path.
+- Sequential RL methods such as SARSA / Q-learning
+- White-box or gradient-based attacks (all experiments are black-box)
 
 ---
 
@@ -59,22 +60,29 @@ Do not collapse these artifacts back into a single ambiguous field.
 
 ---
 
-## 4. Policy modes
+## 4. Policy modes and model matrix
 
-The conference path must treat selector policy as a first-class experiment variable.
+Selector policy is a first-class experiment variable.
 
 Required policy modes:
-- `random_choice`
-- `agent_based_decision`
-- `rl_bandit`
+- `random_choice` — non-adaptive baseline
+- `agent_based_decision` — LLM-led ReAct reasoning baseline
+- `rl_bandit` — bandit-based tactic selection; `bandit_algorithm` selects:
+  - `ucb1` — UCB1 (optimism-based, exploration bonus $\sqrt{2 \ln t / n_a}$)
+  - `thompson` — Thompson Sampling (Beta-Bernoulli posterior)
+  - `klucb` — KL-UCB (KL-divergence index, binary search)
+  - `exp3` — EXP3 (importance-weighted, adversarial setting)
 
-### Policy intent
+All policies operate through the same `SelectorPolicy` protocol.
 
-- `random_choice`: non-adaptive baseline
-- `agent_based_decision`: current LLM-led selector baseline
-- `rl_bandit`: first RL baseline for tactic/arm selection
+### Cross-model matrix (thesis scope)
 
-All three must operate through the same selector-facing contract.
+| Role | Models |
+|------|--------|
+| Attacker (target LLM) | `llama3.1:8b`, `tulu3:8b`, `olmo2:7b` |
+| Judge | `qwen2.5-coder:7b`, `deepseek-coder:6.7b`, `codellama:7b`, `starcoder2:7b` |
+
+Full matrix: 3 attacker × 4 judge × 6 policies × 2 datasets = see `RUNBOOK.txt`.
 
 ---
 
@@ -162,14 +170,17 @@ When changing this repo for the conference path, assume the following priority o
 
 ## 11. Short operational summary
 
-A contributor working on the current paper should understand the project as follows:
+A contributor working on this project should understand:
 
-- We are attacking the **LLM judge**, not redefining correctness.
-- We compare **three selector policies** on **two benchmarks**.
-- We stop early on syntactically invalid artifacts before execution.
-- We save every run in a stable format for later plotting.
-- We generate paper figures from saved results, not from rerunning experiments.
-- We are **not** using Gitea in the current conference track.
+- We are attacking the **LLM judge** (code reviewer), not the code generator.
+  Attack success = (deterministic tests FAIL) AND (LLM judge says PASS).
+- We compare **six selector policies** (random, ReAct, UCB1, Thompson, KL-UCB, EXP3)
+  on **two datasets** (adversarial_code_buggy, cubert_wbo) across a
+  3-attacker × 4-judge model matrix.
+- We stop early on syntactically invalid artifacts before deterministic execution.
+- We save every run in a stable format (`results/`) for later plotting.
+- We generate thesis figures from saved results via `plot.py`, not by rerunning.
+- We are **not** using Gitea.
 
 ---
 

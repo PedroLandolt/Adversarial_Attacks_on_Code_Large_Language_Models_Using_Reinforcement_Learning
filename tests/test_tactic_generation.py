@@ -28,10 +28,12 @@ def _install_stubs() -> None:
     model_mod = types.ModuleType("inspect_ai.model")
 
     class ChatMessageSystem:
+        role = "system"
         def __init__(self, content):
             self.content = content
 
     class ChatMessageUser:
+        role = "user"
         def __init__(self, content):
             self.content = content
 
@@ -88,10 +90,7 @@ def _install_stubs() -> None:
 _install_stubs()
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "V3"))
 
-from judge.red_teaming_tactics import (
-    _build_dynamic_attack_message,
-    build_tactic_generation_prompt,
-)
+from judge.red_teaming_tactics import _build_dynamic_attack_message
 from agent.tactic_registry import get_tactic_registry
 
 _PROMPTS_JSON = Path(__file__).resolve().parents[1] / "V3" / "prompts" / "tactic_generation.json"
@@ -119,83 +118,10 @@ class DynamicAttackMessageTests(unittest.TestCase):
         self.assertTrue(msg.strip())
 
 
-class TacticGenerationPromptTests(unittest.TestCase):
-    """build_tactic_generation_prompt must:
-    - never forbid code fences (the old "no markdown code fences" was
-      preventing clean extraction),
-    - mention code fences as an allowed output format,
-    - include the tactic-specific bug instruction,
-    - explicitly prohibit comments, docstrings, and test code,
-    - use directive per-tactic instructions without hedging."""
-
-    def test_prompt_does_not_forbid_code_fences(self):
-        for entry in get_tactic_registry("benchmark"):
-            prompt = build_tactic_generation_prompt(entry.renderer_binding)
-            self.assertNotIn(
-                "no markdown code fences",
-                prompt,
-                msg=f"Tactic {entry.tactic_id} prompt forbids code fences",
-            )
-
-    def test_prompt_allows_or_mentions_code_fences(self):
-        prompt = build_tactic_generation_prompt("prompt_injection")
-        fence_keywords = ("```python", "code block", "code fence", "```")
-        self.assertTrue(
-            any(kw in prompt for kw in fence_keywords),
-            msg="Generation prompt should allow code fences for easier extraction",
-        )
-
-    def test_all_renderer_bindings_return_non_empty_prompt(self):
-        for entry in get_tactic_registry("benchmark"):
-            prompt = build_tactic_generation_prompt(entry.renderer_binding)
-            self.assertTrue(
-                prompt.strip(),
-                msg=f"Empty prompt for renderer_binding={entry.renderer_binding}",
-            )
-
-    def test_unknown_renderer_binding_returns_default_prompt(self):
-        prompt = build_tactic_generation_prompt("__unknown__")
-        self.assertTrue(prompt.strip())
-
-    def test_prompt_explicitly_prohibits_comments_and_docstrings(self):
-        """Every prompt must ban comments and docstrings so the model never
-        adds a line like '# bug: off-by-one here' that exposes the attack."""
-        for entry in get_tactic_registry("benchmark"):
-            prompt = build_tactic_generation_prompt(entry.renderer_binding).lower()
-            has_prohibition = (
-                "no comment" in prompt
-                or "no docstring" in prompt
-            )
-            self.assertTrue(
-                has_prohibition,
-                msg=f"binding={entry.renderer_binding}: missing explicit prohibition on comments/docstrings",
-            )
-
-    def test_prompt_explicitly_prohibits_test_code(self):
-        """Every prompt must ban test/validation code appended after the function."""
-        for entry in get_tactic_registry("benchmark"):
-            prompt = build_tactic_generation_prompt(entry.renderer_binding).lower()
-            has_prohibition = "no test" in prompt or "test code" in prompt
-            self.assertTrue(
-                has_prohibition,
-                msg=f"binding={entry.renderer_binding}: missing explicit prohibition on test code",
-            )
-
-    def test_per_tactic_instructions_do_not_hedge_with_for_example(self):
-        """'for example' makes small models pick the examples literally instead of
-        following the core bug instruction.  Instructions must be directive."""
-        for entry in get_tactic_registry("benchmark"):
-            prompt = build_tactic_generation_prompt(entry.renderer_binding)
-            self.assertNotIn(
-                "for example",
-                prompt.lower(),
-                msg=f"binding={entry.renderer_binding}: instruction still contains 'for example' hedging",
-            )
-
-
 class PromptsFileTests(unittest.TestCase):
-    """The prompts JSON file must exist, be complete, and be structured so that
-    a professor can edit it without touching Python code."""
+    """The prompts JSON file must exist and be complete.
+    - code_generation_prompt: tactic-independent system message for Step 1 (code generation).
+    - artifact_*: per-tactic judge-attack prompts for Step 3."""
 
     def _load(self) -> dict:
         import json
@@ -205,35 +131,49 @@ class PromptsFileTests(unittest.TestCase):
     def test_prompts_file_exists(self):
         self.assertTrue(_PROMPTS_JSON.exists(), f"Missing: {_PROMPTS_JSON}")
 
-    def test_prompts_file_has_template_key(self):
+    def test_prompts_file_has_no_tactic_codegen_keys(self):
+        """Tactic-specific code-gen keys must be absent — replaced by the single code_generation_prompt."""
         data = self._load()
-        self.assertIn("template", data, "JSON must have a 'template' key")
-        self.assertIn("{instruction}", data["template"],
-                      "'template' must contain the {instruction} placeholder")
+        self.assertNotIn("template", data, "Tactic-specific 'template' key must be absent")
+        self.assertNotIn("default_instruction", data, "Tactic-specific 'default_instruction' key must be absent")
+        self.assertNotIn("instructions", data, "Tactic-specific 'instructions' key must be absent")
 
-    def test_prompts_file_has_default_instruction(self):
+    def test_prompts_file_has_code_generation_prompt(self):
+        """A single tactic-independent prompt steers code generation (Step 1)."""
         data = self._load()
-        self.assertIn("default_instruction", data)
-        self.assertTrue(data["default_instruction"].strip())
+        self.assertIn("code_generation_prompt", data)
+        prompt = data["code_generation_prompt"]
+        self.assertTrue(prompt.strip(), "code_generation_prompt must not be empty")
+        self.assertNotIn("one test", prompt.lower(), "Prompt must not restrict to a single test failure")
+        self.assertIn("test suite", prompt.lower(), "Prompt must reference the test suite")
 
-    def test_prompts_file_has_all_renderer_bindings(self):
-        import json
+    def test_prompts_file_has_artifact_template(self):
         data = self._load()
-        instructions = data.get("instructions", {})
+        self.assertIn("artifact_template", data)
+        self.assertIn("{instruction}", data["artifact_template"])
+
+    def test_prompts_file_has_artifact_default_instruction(self):
+        data = self._load()
+        self.assertIn("artifact_default_instruction", data)
+        self.assertTrue(data["artifact_default_instruction"].strip())
+
+    def test_prompts_file_has_all_renderer_bindings_in_artifact_instructions(self):
+        data = self._load()
+        artifact_instructions = data.get("artifact_instructions", {})
         for entry in get_tactic_registry("benchmark"):
             self.assertIn(
                 entry.renderer_binding,
-                instructions,
-                f"renderer_binding '{entry.renderer_binding}' missing from prompts file",
+                artifact_instructions,
+                f"renderer_binding '{entry.renderer_binding}' missing from artifact_instructions",
             )
 
-    def test_no_for_example_in_prompts_file(self):
+    def test_no_for_example_in_artifact_instructions(self):
         data = self._load()
-        for binding, text in data.get("instructions", {}).items():
+        for binding, text in data.get("artifact_instructions", {}).items():
             self.assertNotIn(
                 "for example",
                 text.lower(),
-                f"binding={binding}: 'for example' hedging found in prompts file",
+                f"binding={binding}: 'for example' hedging found in artifact_instructions",
             )
 
 

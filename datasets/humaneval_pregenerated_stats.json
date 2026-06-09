@@ -1,0 +1,18 @@
+{
+  "benchmark": "humaneval",
+  "is_partial_run": false,
+  "total_attempted": 164,
+  "saved": 134,
+  "skipped_correct": 10,
+  "skipped_nocode": 0,
+  "skipped_judge_pass": 20,
+  "yield_rate": 0.8171,
+  "baseline_judge_pass_rate": 0.1299,
+  "generation_model": "llama3.1:8b",
+  "generation_temperature": 0.5,
+  "judge_model": "qwen2.5-coder:7b",
+  "generated_at": "2026-06-05T17:57:04.099488+00:00",
+  "manually_injected": 10,
+  "saved_including_manual": 144,
+  "last_manual_injection": "2026-06-07T15:44:15.514865+00:00"
+}

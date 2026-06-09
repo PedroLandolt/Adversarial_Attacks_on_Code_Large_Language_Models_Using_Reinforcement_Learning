@@ -17,9 +17,7 @@ from agent.tactic_registry import get_supported_tactic_families, get_tactic_entr
 
 _PROMPTS_FILE = Path(__file__).resolve().parent.parent / "prompts" / "tactic_generation.json"
 _raw_prompts = json.loads(_PROMPTS_FILE.read_text(encoding="utf-8"))
-_GENERATION_TEMPLATE: str = _raw_prompts["template"]
-_DEFAULT_GENERATION_INSTRUCTION: str = _raw_prompts["default_instruction"]
-_TACTIC_GENERATION_INSTRUCTIONS: dict[str, str] = _raw_prompts["instructions"]
+_CODE_GENERATION_PROMPT: str = _raw_prompts.get("code_generation_prompt", "")
 _ARTIFACT_TEMPLATE: str = _raw_prompts.get("artifact_template", "")
 _DEFAULT_ARTIFACT_INSTRUCTION: str = _raw_prompts.get("artifact_default_instruction", "")
 _ARTIFACT_INSTRUCTIONS: dict[str, str] = _raw_prompts.get("artifact_instructions", {})
@@ -329,21 +327,14 @@ async def generate_tactic_artifact(
     return apply_tactic(code, tactic, problem=problem)
 
 
-def build_tactic_generation_prompt(renderer_binding: str) -> str:
-    """Return a tactic-specific system instruction to inject before adversarial generation.
+def get_code_generation_prompt() -> str:
+    """Return the general bug-generation system prompt for Step 1 (code generation).
 
-    Prompts are loaded from V3/prompts/tactic_generation.json so they can be
-    edited without touching Python code.
-
-    Steers the target LLM toward syntactically valid Python with a deliberate,
-    tactic-aligned logical error, reducing syntax failures and generation variance.
-    The instruction is injected as a system message; the original problem statement
-    is left untouched as the user message.
+    This prompt is tactic-independent. It instructs the target LLM to produce
+    code with a subtle semantic error while keeping the function visually plausible.
+    Loaded from prompts/tactic_generation.json so it can be edited without touching Python.
     """
-    instruction = _TACTIC_GENERATION_INSTRUCTIONS.get(
-        renderer_binding, _DEFAULT_GENERATION_INSTRUCTION
-    )
-    return _GENERATION_TEMPLATE.format(instruction=instruction)
+    return _CODE_GENERATION_PROMPT
 
 
 def get_all_tactics() -> list[str]:

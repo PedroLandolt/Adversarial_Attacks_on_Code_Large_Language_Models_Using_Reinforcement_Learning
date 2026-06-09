@@ -88,8 +88,8 @@ class PlottingPipelineTests(unittest.TestCase):
             selector_cot_enabled=True,
             bandit_freeze_weights_effective=False,
             experiment_mode="iterative",
-            target_model="test-model",
-            judge_model="judge-model",
+            code_generation_model="test-model",
+            target_model="judge-model",
             selector_model="selector-model",
             max_iterations=3,
         )

@@ -1,0 +1,112 @@
+{
+  "generated_at": "2026-06-05T23:27:55.814238",
+  "run_count": 15,
+  "group_count": 3,
+  "plot_count": 20,
+  "plots": [
+    "plots\\20260605_190525\\rl_bandit\\attack_success_rate_by_policy_mode.png",
+    "plots\\20260605_190525\\rl_bandit\\success_by_benchmark.png",
+    "plots\\20260605_190525\\rl_bandit\\syntax_invalid_rate_by_policy_mode.png",
+    "plots\\20260605_190525\\rl_bandit\\one_shot_vs_iterative_comparison.png",
+    "plots\\20260605_190525\\rl_bandit\\train_validation_test_comparison.png",
+    "plots\\20260605_190525\\rl_bandit\\iterations_to_success_distribution.png",
+    "plots\\20260605_190525\\rl_bandit\\arm_pull_counts.png",
+    "plots\\20260605_190525\\rl_bandit\\average_reward_by_arm.png",
+    "plots\\20260605_190525\\rl_bandit\\arm_preference_over_time_adversarial_code_buggy_rl_bandit_iterative_test_ucb1.png",
+    "plots\\20260605_190525\\rl_bandit\\exploit_explore_adversarial_code_buggy_rl_bandit_iterative_test_ucb1.png",
+    "plots\\20260605_190525\\rl_bandit\\rl_bandit_evolution_adversarial_code_buggy_rl_bandit_iterative_test_ucb1.png",
+    "plots\\20260605_190525\\rl_bandit\\arm_preference_over_time_adversarial_code_buggy_rl_bandit_iterative_train_ucb1.png",
+    "plots\\20260605_190525\\rl_bandit\\exploit_explore_adversarial_code_buggy_rl_bandit_iterative_train_ucb1.png",
+    "plots\\20260605_190525\\rl_bandit\\rl_bandit_evolution_adversarial_code_buggy_rl_bandit_iterative_train_ucb1.png",
+    "plots\\20260605_190525\\rl_bandit\\arm_preference_over_time_adversarial_code_buggy_rl_bandit_iterative_validation_ucb1.png",
+    "plots\\20260605_190525\\rl_bandit\\exploit_explore_adversarial_code_buggy_rl_bandit_iterative_validation_ucb1.png",
+    "plots\\20260605_190525\\rl_bandit\\rl_bandit_evolution_adversarial_code_buggy_rl_bandit_iterative_validation_ucb1.png",
+    "plots\\20260605_190525\\rl_bandit\\policy_comparison_test.png",
+    "plots\\20260605_190525\\rl_bandit\\tactic_win_rate.png",
+    "plots\\20260605_190525\\rl_bandit\\success_breakdown_baseline_vs_tactic.png"
+  ],
+  "group_artifacts": [
+    {
+      "benchmark": "adversarial_code_buggy",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "test",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\20260605_190525\\rl_bandit\\arm_preference_over_time_adversarial_code_buggy_rl_bandit_iterative_test_ucb1.png"
+    },
+    {
+      "benchmark": "adversarial_code_buggy",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "test",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\20260605_190525\\rl_bandit\\exploit_explore_adversarial_code_buggy_rl_bandit_iterative_test_ucb1.png"
+    },
+    {
+      "benchmark": "adversarial_code_buggy",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "test",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\20260605_190525\\rl_bandit\\rl_bandit_evolution_adversarial_code_buggy_rl_bandit_iterative_test_ucb1.png"
+    },
+    {
+      "benchmark": "adversarial_code_buggy",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "train",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\20260605_190525\\rl_bandit\\arm_preference_over_time_adversarial_code_buggy_rl_bandit_iterative_train_ucb1.png"
+    },
+    {
+      "benchmark": "adversarial_code_buggy",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "train",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\20260605_190525\\rl_bandit\\exploit_explore_adversarial_code_buggy_rl_bandit_iterative_train_ucb1.png"
+    },
+    {
+      "benchmark": "adversarial_code_buggy",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "train",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\20260605_190525\\rl_bandit\\rl_bandit_evolution_adversarial_code_buggy_rl_bandit_iterative_train_ucb1.png"
+    },
+    {
+      "benchmark": "adversarial_code_buggy",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "validation",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\20260605_190525\\rl_bandit\\arm_preference_over_time_adversarial_code_buggy_rl_bandit_iterative_validation_ucb1.png"
+    },
+    {
+      "benchmark": "adversarial_code_buggy",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "validation",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\20260605_190525\\rl_bandit\\exploit_explore_adversarial_code_buggy_rl_bandit_iterative_validation_ucb1.png"
+    },
+    {
+      "benchmark": "adversarial_code_buggy",
+      "policy_mode": "rl_bandit",
+      "experiment_mode": "iterative",
+      "experiment_split": "validation",
+      "bandit_algorithm": "ucb1",
+      "figure": "plots\\20260605_190525\\rl_bandit\\rl_bandit_evolution_adversarial_code_buggy_rl_bandit_iterative_validation_ucb1.png"
+    }
+  ],
+  "source_summary": {
+    "results_dir": "results",
+    "run_count": 15,
+    "benchmarks": [
+      "adversarial_code_buggy"
+    ],
+    "policy_modes": [
+      "rl_bandit"
+    ]
+  }
+}
