@@ -1,0 +1,13 @@
+judge,judge_tag,policy,corpus,n,avg_iter_to_success,n_winners
+qwen2.5-coder:7b,qwen,random,adversarial-code-buggy,148,2.24,128
+qwen2.5-coder:7b,qwen,random,cubert_wbo,150,2.26,131
+qwen2.5-coder:7b,qwen,react,adversarial-code-buggy,148,1.49,136
+qwen2.5-coder:7b,qwen,react,cubert_wbo,150,1.64,145
+qwen2.5-coder:7b,qwen,ucb1,adversarial-code-buggy,148,1.51,143
+qwen2.5-coder:7b,qwen,ucb1,cubert_wbo,150,1.56,145
+qwen2.5-coder:7b,qwen,thompson,adversarial-code-buggy,148,1.59,145
+qwen2.5-coder:7b,qwen,thompson,cubert_wbo,150,1.61,147
+qwen2.5-coder:7b,qwen,kl-ucb,adversarial-code-buggy,148,1.39,143
+qwen2.5-coder:7b,qwen,kl-ucb,cubert_wbo,150,1.42,144
+qwen2.5-coder:7b,qwen,exp3,adversarial-code-buggy,148,1.57,142
+qwen2.5-coder:7b,qwen,exp3,cubert_wbo,150,1.47,147

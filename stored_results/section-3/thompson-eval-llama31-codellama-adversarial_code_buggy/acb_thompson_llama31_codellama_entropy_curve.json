@@ -1,0 +1,9 @@
+[
+  {
+    "epoch": 1,
+    "arm_entropy": 1.4969,
+    "normalized_entropy": 0.6813,
+    "n_pulls": 494,
+    "checkpoint": "acb_thompson_llama31_codellama.json"
+  }
+]

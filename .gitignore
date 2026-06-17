@@ -218,3 +218,4 @@ approve_message.txt
 .tmp_test_aggregation
 results/
 logs/
+*.eval

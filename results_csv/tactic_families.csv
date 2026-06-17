@@ -1,0 +1,10 @@
+tactic_id,tactic_family,taxonomy_category,group
+legacy_injection,injection,structural_logic,Legacy
+legacy_output,output,obfuscation_noise,Legacy
+legacy_semantic,semantic,narrative_contextual,Legacy
+legacy_cot,cot,strategy_pacing,Legacy
+taxonomy_roleplay,roleplay,narrative_contextual,Taxonomy
+taxonomy_appeal_to_authority,appeal_to_authority,pressure_persuasion,Taxonomy
+taxonomy_formatting_smuggling,formatting_smuggling,structural_logic,Taxonomy
+taxonomy_recursion_crescendo,recursion_crescendo,strategy_pacing,Taxonomy
+taxonomy_crowding,crowding,obfuscation_noise,Taxonomy

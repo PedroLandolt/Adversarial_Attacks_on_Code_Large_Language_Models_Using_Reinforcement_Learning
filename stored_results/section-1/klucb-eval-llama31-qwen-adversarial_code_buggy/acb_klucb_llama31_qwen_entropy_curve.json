@@ -1,0 +1,9 @@
+[
+  {
+    "epoch": 1,
+    "arm_entropy": 1.3647,
+    "normalized_entropy": 0.6211,
+    "n_pulls": 1522,
+    "checkpoint": "acb_klucb_llama31_qwen.json"
+  }
+]

@@ -1,0 +1,9 @@
+[
+  {
+    "epoch": 1,
+    "arm_entropy": 2.112,
+    "normalized_entropy": 0.9612,
+    "n_pulls": 1666,
+    "checkpoint": "cubert_exp3_llama31_qwen.json"
+  }
+]

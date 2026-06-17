@@ -1,0 +1,9 @@
+[
+  {
+    "epoch": 1,
+    "arm_entropy": 1.5779,
+    "normalized_entropy": 0.7181,
+    "n_pulls": 1465,
+    "checkpoint": "cubert_klucb_llama31_deepseek.json"
+  }
+]

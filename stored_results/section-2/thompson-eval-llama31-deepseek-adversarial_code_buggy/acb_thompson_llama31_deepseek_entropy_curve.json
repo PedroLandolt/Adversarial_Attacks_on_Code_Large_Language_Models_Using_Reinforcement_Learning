@@ -1,0 +1,9 @@
+[
+  {
+    "epoch": 1,
+    "arm_entropy": 0.9715,
+    "normalized_entropy": 0.4422,
+    "n_pulls": 947,
+    "checkpoint": "acb_thompson_llama31_deepseek.json"
+  }
+]

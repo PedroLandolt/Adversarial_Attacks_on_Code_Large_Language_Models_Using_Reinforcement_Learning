@@ -1,0 +1,9 @@
+algorithm,corpus,epoch,entropy_nats,normalized_entropy,n_pulls
+ucb1,adversarial-code-buggy,1,1.4262,0.6491,1497
+thompson,adversarial-code-buggy,1,0.6308,0.2871,1315
+klucb,adversarial-code-buggy,1,1.3647,0.6211,1522
+exp3,adversarial-code-buggy,1,2.0984,0.955,2053
+ucb1,cubert_wbo,1,1.6684,0.7593,1292
+thompson,cubert_wbo,1,0.9076,0.4131,1158
+klucb,cubert_wbo,1,1.6011,0.7287,1300
+exp3,cubert_wbo,1,2.112,0.9612,1666
