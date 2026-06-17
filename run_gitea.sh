@@ -32,7 +32,7 @@ echo "  LIMIT=$LIMIT"
 echo "  MAX_SAMPLES=$MAX_SAMPLES"
 
 inspect eval \
-  V3/adversarial_attack.py@adversarial_gitea_react_attack \
+  JESTER/adversarial_attack.py@adversarial_gitea_react_attack \
   --model "$MODEL" \
   -T judge_model="$JUDGE_MODEL" \
   -T selector_model="$SELECTOR_MODEL" \

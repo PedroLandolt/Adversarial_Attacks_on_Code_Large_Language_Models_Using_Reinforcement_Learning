@@ -1,5 +1,5 @@
 """
-Tests for V3/judge/llm_judge.py — parse_response behaviour.
+Tests for JESTER/judge/llm_judge.py — parse_response behaviour.
 
 llama3.1:8b wraps its JSON output in ```json fences and sometimes leaves
 a trailing explanation line.  These tests pin the exact formats seen in

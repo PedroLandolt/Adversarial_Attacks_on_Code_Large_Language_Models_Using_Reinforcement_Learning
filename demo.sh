@@ -182,7 +182,7 @@ run_exp() {
     step "$LABEL"
     log "  results_dir → $ABS_DEST"
 
-    if PYTHONPATH=V3 "$INSPECT_BIN" eval V3/adversarial_attack.py@adversarial_code_llm \
+    if PYTHONPATH=V3 "$INSPECT_BIN" eval JESTER/adversarial_attack.py@adversarial_code_llm \
         --model "$MODEL" \
         -T benchmark="$BENCHMARK" \
         -T mutation_strategy=react \
@@ -507,7 +507,7 @@ section "Aggregating Results"
 
 for SUITE in 1_tactic_isolation 2_policy_comparison 3_iteration_depth 4_cot_ablation combined; do
     step "$SUITE"
-    "$PYTHON_BIN" V3/scripts/aggregate_results.py \
+    "$PYTHON_BIN" JESTER/scripts/aggregate_results.py \
         --results-dir  "${RESULTS_DIR}/${SUITE}" \
         --output-dir   "${AGGREGATES_DIR}/${SUITE}" \
         >> "$LOG_FILE" 2>&1 || warn "Aggregation failed for $SUITE (see log)"

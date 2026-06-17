@@ -1,5 +1,5 @@
 """
-Tests for V3/utils/code_extraction.py.
+Tests for JESTER/utils/code_extraction.py.
 
 RED phase: these tests define the required behavior.  All must fail
 before the utility module is created, then pass after.

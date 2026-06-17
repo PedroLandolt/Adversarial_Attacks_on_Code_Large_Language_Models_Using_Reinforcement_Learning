@@ -18,16 +18,16 @@ Deterministic tests are the ground truth. The LLM judge is the thing being attac
 
 ## Main entrypoints
 
-- `V3/adversarial_attack.py` is the main benchmark task.
-- `V3/agent/selector_policy.py` defines the selector boundary and policy modes.
-- `V3/utils/results_persistence.py` writes run outputs.
-- `V3/utils/reward_accounting.py` defines reward and arm accounting.
-- `V3/utils/benchmark_loader.py` loads MBPP and HumanEval.
+- `JESTER/adversarial_attack.py` is the main benchmark task.
+- `JESTER/agent/selector_policy.py` defines the selector boundary and policy modes.
+- `JESTER/utils/results_persistence.py` writes run outputs.
+- `JESTER/utils/reward_accounting.py` defines reward and arm accounting.
+- `JESTER/utils/benchmark_loader.py` loads MBPP and HumanEval.
 
 ## Project structure
 
 ```text
-V3/
+JESTER/
   adversarial_attack.py        # Main Inspect task for MBPP/HumanEval attack runs.
   AGENTS.md                    # Agent instructions: active conference-track scope.
   agent/
@@ -60,7 +60,7 @@ weights/
 
 ## Tactic registry
 
-Nine tactics are defined in `V3/agent/tactic_registry.py`. Each has a `tactic_id`, `tactic_family`, `renderer_binding`, and `taxonomy_category`:
+Nine tactics are defined in `JESTER/agent/tactic_registry.py`. Each has a `tactic_id`, `tactic_family`, `renderer_binding`, and `taxonomy_category`:
 
 | tactic_family          | renderer_binding                  | taxonomy_category    |
 | ---------------------- | --------------------------------- | -------------------- |
@@ -74,7 +74,7 @@ Nine tactics are defined in `V3/agent/tactic_registry.py`. Each has a `tactic_id
 | `recursion_crescendo`  | `strategy_recursion_crescendo`    | strategy_pacing      |
 | `crowding`             | `obfuscation_crowding`            | obfuscation_noise    |
 
-`renderer_binding` is the key used to look up tactic-specific system prompts in `V3/prompts/tactic_generation.json` and to dispatch the `apply_tactic()` renderer in `V3/judge/red_teaming_tactics.py`.
+`renderer_binding` is the key used to look up tactic-specific system prompts in `JESTER/prompts/tactic_generation.json` and to dispatch the `apply_tactic()` renderer in `JESTER/judge/red_teaming_tactics.py`.
 
 ## Experiment flow
 
@@ -131,16 +131,16 @@ Prefer one-shot validation when testing a specific attack in isolation. Use it t
 - Python: `>= 3.10`.
 - Install dependencies from the repository root with `python -m pip install -r requirements.txt`.
 - Create and activate a virtual environment first if needed.
-- The run presets load environment variables from `.env` or `V3/.env` when present.
+- The run presets load environment variables from `.env` or `JESTER/.env` when present.
 - Common variables are `MODEL`, `JUDGE_MODEL`, and `SELECTOR_MODEL`.
 - Use Ollama locally for the default path; make sure the Ollama server is running before launching `ollama/...` models.
 - API keys are only needed if you switch to non-Ollama providers through LiteLLM.
 - **Docker is required**: the benchmark task runs in `sandbox="docker"`. Deterministic test execution uses `sandbox().exec(...)`.
-- **`PYTHONPATH=V3`** is required when invoking Inspect from the repo root. All imports in `adversarial_attack.py` are relative to `V3/` (e.g. `from agent.selector_policy import ...`), not to the repo root.
+- **`PYTHONPATH=V3`** is required when invoking Inspect from the repo root. All imports in `adversarial_attack.py` are relative to `JESTER/` (e.g. `from agent.selector_policy import ...`), not to the repo root.
 
 ## Architecture notes
 
-**Conference scope**: `V3/AGENTS.md` defines the active conference-track boundaries: MBPP + HumanEval only, three policy modes, Gitea and sequential RL (SARSA/Q-learning) out of scope. Consult it before adding new policy types or benchmarks.
+**Conference scope**: `JESTER/AGENTS.md` defines the active conference-track boundaries: MBPP + HumanEval only, three policy modes, Gitea and sequential RL (SARSA/Q-learning) out of scope. Consult it before adding new policy types or benchmarks.
 
 **Module layering:**
 - `adversarial_attack.py` is the orchestration layer — it owns the benchmark loop, artifact lifecycle, and metadata.
@@ -156,14 +156,14 @@ Prefer one-shot validation when testing a specific attack in isolation. Use it t
 
 ## Data and weights
 
-Published dataset: `PedroLandolt/adversarial-code-buggy` on HuggingFace — 940 records (790 MBPP + 150 HumanEval), uploaded as `data/train.jsonl`. Local copy at `datasets/adversarial-code-buggy.jsonl`. Schema: `source`, `task_id`, `problem_text`, `buggy_code`, `original_code`, `test_list` (MBPP), `test_harness` + `entry_point` (HumanEval), `baseline_judge_decision`, `baseline_judge_confidence`. Rebuild and re-upload: `python V3/utils/upload_to_hub.py` (requires `HF_TOKEN`).
+Published dataset: `PedroLandolt/adversarial-code-buggy` on HuggingFace — 940 records (790 MBPP + 150 HumanEval), uploaded as `data/train.jsonl`. Local copy at `datasets/adversarial-code-buggy.jsonl`. Schema: `source`, `task_id`, `problem_text`, `buggy_code`, `original_code`, `test_list` (MBPP), `test_harness` + `entry_point` (HumanEval), `baseline_judge_decision`, `baseline_judge_confidence`. Rebuild and re-upload: `python JESTER/utils/upload_to_hub.py` (requires `HF_TOKEN`).
 
 ## How to run
 
 Use Inspect with the task entrypoint:
 
 ```bash
-inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+inspect eval JESTER/adversarial_attack.py@adversarial_code_llm \
   --model ollama/llama3.1:8b \
   -T benchmark=mbpp \
   -T mutation_strategy=react \
@@ -197,7 +197,7 @@ After running experiments, aggregate and plot:
 
 ```bash
 # Aggregate results from all runs in results/
-python V3/scripts/aggregate_results.py
+python JESTER/scripts/aggregate_results.py
 
 # Generate plots from aggregated data (output goes to plots/)
 python plot.py
@@ -210,39 +210,38 @@ python plot.py
 Run all three policies end-to-end (RL train→val→test, random, agent, aggregate, plot) with a single script. Must be run from the project root (`Adversarial_Attacks_on_Code_Large_Language_Models_Using_Reinforcement_Learning/`):
 
 ```bash
-# Full run (5 RL epochs, all samples)
-bash V3/scripts/run_full_experiment.sh
+# Full run (3 RL epochs, 70/15/15 split enforced per run)
+bash JESTER/scripts/run_full_experiment.sh
 
 # With options
-bash V3/scripts/run_full_experiment.sh --benchmark humaneval --epochs 5
+bash JESTER/scripts/run_full_experiment.sh --benchmark humaneval --epochs 3
 
 # Smoke test (caps every phase to 5 samples, 1 epoch)
-bash V3/scripts/run_full_experiment.sh --samples 5 --epochs 1
+bash JESTER/scripts/run_full_experiment.sh --samples 5 --epochs 1
 
 # Background (logs go to logs/experiment/)
-nohup bash V3/scripts/run_full_experiment.sh > /dev/null 2>&1 &
+nohup bash JESTER/scripts/run_full_experiment.sh > /dev/null 2>&1 &
 ```
 
 ### RL-only overnight training
 
 ```bash
-bash V3/scripts/train_rl_overnight.sh
-bash V3/scripts/train_rl_overnight.sh --benchmark humaneval --epochs 5
-bash V3/scripts/train_rl_overnight.sh --samples 50   # cap train samples (quick test)
+bash JESTER/scripts/train_rl_overnight.sh
+bash JESTER/scripts/train_rl_overnight.sh --benchmark humaneval --epochs 3
+bash JESTER/scripts/train_rl_overnight.sh --samples 50   # cap train samples (quick test)
 ```
 
 Weight checkpoints are saved per epoch (`weights/mbpp_ucb1_epoch_001.json`, …) so interrupted runs preserve progress.
 
 ### Benchmark split sizes (70/15/15)
 
-MBPP split sizes are computed dynamically from the actual dataset count at runtime
-(`get_benchmark_size('mbpp')` in `benchmark_loader.py`). Current full-config total: **974 samples**
-(374 train + 90 validation + 500 test + 10 prompt from `google-research-datasets/mbpp` `full` config).
+Split boundaries are computed at runtime using `floor(0.70 × N)` on the combined record index.
+The split partition is enforced in `adversarial_attack.py` when `experiment_split` is set.
 
-| Benchmark  | Total        | Train (~70%) | Val (~15%)   | Test (~15%)  |
-| ---------- | ------------ | ------------ | ------------ | ------------ |
-| MBPP       | 974 (dynamic)| 681          | 146 (682–827)| 147 (828–974)|
-| HumanEval  | 164          | 115          | 116–139      | 140–164      |
+| Corpus                      | Total  | Train (~70%) | Val (~15%) | Test (~15%) |
+| --------------------------- | ------ | ------------ | ---------- | ----------- |
+| *adversarial-code-buggy*    | 982    | 687          | 147        | 148         |
+| *cubert_wbo*                | 1,000  | 700          | 150        | 150         |
 
 ## Running tests
 
@@ -300,7 +299,7 @@ Do not touch:
 - `results/` outputs produced by benchmark runs,
 - benchmark data files or generated evaluation artifacts,
 - persisted run folders under `results/<run_id>/`,
-- any files outside `V3/` unless the task explicitly requires it.
+- any files outside `JESTER/` unless the task explicitly requires it.
 - anything that has to do with gitea for now, since that is an experimental path.
 
 ## How to work in this repo
@@ -317,7 +316,7 @@ Run this smoke test **before and after every code change** and do not declare th
 
 **Smoke test command** (Windows; on Unix/macOS replace `.venv/Scripts/inspect` with `.venv/bin/inspect`):
 ```bash
-PYTHONPATH=V3 .venv/Scripts/inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+PYTHONPATH=V3 .venv/Scripts/inspect eval JESTER/adversarial_attack.py@adversarial_code_llm \
   --model ollama/llama3.1:8b \
   -T benchmark=mbpp \
   -T mutation_strategy=react \

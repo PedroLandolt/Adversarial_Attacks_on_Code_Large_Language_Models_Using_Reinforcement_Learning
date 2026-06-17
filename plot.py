@@ -387,20 +387,31 @@ def _plot_training_learning_curve(run_rows: list[dict], output_path: Path) -> st
     )
     if len(train_rows) < 10:
         return None
-    values = [float(r.get("attack_success_rate") or 0.0) for r in train_rows]
-    window = min(30, max(10, len(values) // 8))
-    rolling = [sum(values[max(0, i - window + 1):i + 1]) / (i - max(0, i - window + 1) + 1)
-               for i in range(len(values))]
-    x = list(range(1, len(values) + 1))
+    values = [float(r.get("asr_1shot_win") if r.get("asr_1shot_win") is not None
+                    else r.get("attack_success_rate") or 0.0) for r in train_rows]
+    # Bin into ~50 evenly-spaced windows; show mean ± std per bin
+    n_bins = min(50, len(values) // 5)
+    bin_size = len(values) // n_bins
+    bin_x, bin_mean, bin_lo, bin_hi = [], [], [], []
+    for i in range(n_bins):
+        chunk = values[i * bin_size: (i + 1) * bin_size]
+        if not chunk:
+            continue
+        m = sum(chunk) / len(chunk)
+        s = sqrt(sum((v - m) ** 2 for v in chunk) / max(len(chunk) - 1, 1))
+        bin_x.append(i * bin_size + bin_size / 2)
+        bin_mean.append(m)
+        bin_lo.append(max(0.0, m - s))
+        bin_hi.append(min(1.0, m + s))
     overall_mean = sum(values) / len(values)
     fig, ax = plt.subplots(figsize=(11, 5), constrained_layout=True)
-    ax.scatter(x, values, alpha=0.15, s=8, color="#90CAF9", zorder=1)
-    ax.plot(x, rolling, color="#2196F3", linewidth=2, label=f"Rolling mean (w={window})", zorder=2)
+    ax.fill_between(bin_x, bin_lo, bin_hi, alpha=0.25, color="#2196F3")
+    ax.plot(bin_x, bin_mean, color="#2196F3", linewidth=2, label=f"Mean ± 1 SD (bin={bin_size})")
     ax.axhline(y=overall_mean, color="#555", linestyle="--", linewidth=1,
-               label=f"Overall mean = {overall_mean:.3f}", zorder=3)
+               label=f"Overall mean = {overall_mean:.3f}")
     ax.set_xlabel("Training sample")
-    ax.set_ylabel("Attack Success Rate")
-    ax.set_title("RL Bandit Learning Curve — Training")
+    ax.set_ylabel("1-Shot ASR")
+    ax.set_title("RL Bandit Learning Curve — Training (1-Shot ASR)")
     ax.set_ylim(0, 1.05)
     ax.legend()
     return _save_figure(fig, output_path)
@@ -479,7 +490,7 @@ def _plot_policy_comparison_test(
     output_path: Path,
 ) -> str | None:
     """Headline figure: all policies (Random, ReAct, UCB1, Thompson, KL-UCB, EXP3)
-    on test split, grouped by benchmark. Error bars from run-to-run variance."""
+    on test split, grouped by benchmark. Uses 1-shot ASR as primary metric."""
     test_rows = [r for r in run_rows if (r.get("experiment_split") or "") == "test"]
     if not test_rows:
         return None
@@ -488,12 +499,12 @@ def _plot_policy_comparison_test(
     if not benchmarks:
         return None
 
-    # Build per-(benchmark, policy_label) ASR lists
+    # Build per-(benchmark, policy_label) 1-shot ASR lists (primary metric)
     buckets: dict[tuple[str, str], list[float]] = defaultdict(list)
     for row in test_rows:
         bm = str(row.get("benchmark") or "")
         label = _policy_label(row)
-        asr = row.get("attack_success_rate")
+        asr = row.get("asr_1shot_win") if row.get("asr_1shot_win") is not None else row.get("attack_success_rate")
         if asr is not None:
             buckets[(bm, label)].append(float(asr))
 
@@ -570,7 +581,7 @@ def _plot_algorithm_comparison(run_rows: list[dict], output_path: Path) -> str |
     for row in eval_rows:
         bm = str(row.get("benchmark") or "")
         alg = str(row.get("bandit_algorithm") or "")
-        asr = row.get("attack_success_rate")
+        asr = row.get("asr_1shot_win") if row.get("asr_1shot_win") is not None else row.get("attack_success_rate")
         if asr is not None:
             buckets[(bm, alg)].append(float(asr))
 
@@ -635,11 +646,11 @@ def _plot_cross_model_heatmap(
     if not rows:
         return None
 
-    # Best ASR per (attacker, judge) across all policies
+    # Best 1-shot ASR per (attacker, judge) across all policies
     best: dict[tuple[str, str], float] = {}
     for row in rows:
         key = (_short_model(row.get("selector_model")), _short_model(row.get("target_model")))
-        asr = float(row.get("attack_success_rate") or 0.0)
+        asr = float(row.get("asr_1shot_win") if row.get("asr_1shot_win") is not None else (row.get("attack_success_rate") or 0.0))
         best[key] = max(best.get(key, 0.0), asr)
 
     attackers = sorted({k[0] for k in best})
@@ -707,7 +718,7 @@ def _plot_algorithm_judge_heatmap(
     for row in rows:
         alg = str(row.get("bandit_algorithm") or "")
         jud = _short_model(row.get("target_model"))
-        asr = row.get("attack_success_rate")
+        asr = row.get("asr_1shot_win") if row.get("asr_1shot_win") is not None else row.get("attack_success_rate")
         if asr is not None:
             buckets[(alg, jud)].append(float(asr))
 
@@ -844,12 +855,12 @@ def _plot_attacker_vs_judges(
         if not judges:
             continue
 
-        # Collect per (judge, policy_label) ASR values
+        # Collect per (judge, policy_label) 1-shot ASR values
         buckets: dict[tuple[str, str], list[float]] = defaultdict(list)
         for row in attacker_rows:
             jud = _short_model(row.get("target_model"))
             label = _policy_label(row)
-            asr = row.get("attack_success_rate")
+            asr = row.get("asr_1shot_win") if row.get("asr_1shot_win") is not None else row.get("attack_success_rate")
             if asr is not None:
                 buckets[(jud, label)].append(float(asr))
 
@@ -1118,6 +1129,475 @@ def _plot_tactic_judge_heatmap(
 
 
 # ---------------------------------------------------------------------------
+# Per-epoch ASR learning curve — one line per bandit algorithm
+# ---------------------------------------------------------------------------
+
+def _plot_epoch_asr_curve(evolution_by_group: list[dict], output_path: Path) -> str | None:
+    """ASR per training epoch, one line per bandit algorithm.
+    Averages over all model combinations that share the same algorithm.
+    Shaded band = ±1 std across combinations."""
+    from matplotlib.ticker import MaxNLocator
+
+    train_groups = [
+        g for g in evolution_by_group
+        if g.get("policy_mode") == "rl_bandit"
+        and (g.get("experiment_split") or "") == "train"
+        and g.get("bandit_algorithm")
+        and g.get("benchmark")
+    ]
+    if not train_groups:
+        return None
+
+    benchmarks = sorted({str(g["benchmark"]) for g in train_groups})
+    if not benchmarks:
+        return None
+
+    # (benchmark, algorithm) -> list of per-epoch ASR sequences (one per model combo)
+    combo_asr: dict[tuple[str, str], list[list[float]]] = defaultdict(list)
+    for group in train_groups:
+        bm = str(group["benchmark"])
+        alg = str(group["bandit_algorithm"])
+        epoch_asrs = [
+            float(r["attack_success_rate"]) * 100
+            for r in group.get("runs", [])
+            if r.get("attack_success_rate") is not None
+        ]
+        if len(epoch_asrs) >= 2:
+            combo_asr[(bm, alg)].append(epoch_asrs)
+
+    if not combo_asr:
+        return None
+
+    n_bm = len(benchmarks)
+    fig, axes = plt.subplots(1, n_bm, figsize=(6 * n_bm, 5),
+                             sharey=False, constrained_layout=True)
+    if n_bm == 1:
+        axes = [axes]
+
+    for ax, bm in zip(axes, benchmarks):
+        for alg in ALGO_ORDER:
+            combos = combo_asr.get((bm, alg), [])
+            if not combos:
+                continue
+            min_len = min(len(c) for c in combos)
+            aligned = [c[:min_len] for c in combos]
+            means = [sum(c[i] for c in aligned) / len(aligned) for i in range(min_len)]
+            stds = [
+                sqrt(sum((c[i] - means[i]) ** 2 for c in aligned) / max(len(aligned) - 1, 1))
+                for i in range(min_len)
+            ]
+            epochs = list(range(1, min_len + 1))
+            color = ALGO_COLORS.get(alg, "#9E9E9E")
+            ax.plot(epochs, means, marker="o", linewidth=2, color=color,
+                    label=ALGO_DISPLAY.get(alg, alg))
+            ax.fill_between(
+                epochs,
+                [m - s for m, s in zip(means, stds)],
+                [m + s for m, s in zip(means, stds)],
+                alpha=0.15, color=color,
+            )
+
+        ax.set_xlabel("Training epoch")
+        ax.set_ylabel("Attack Success Rate (%)")
+        ax.set_title(bm.upper())
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.legend(loc="lower right", fontsize=8)
+
+    fig.suptitle("Bandit Training Progress — ASR per Epoch",
+                 fontsize=13, fontweight="bold")
+    return _save_figure(fig, output_path)
+
+
+# ---------------------------------------------------------------------------
+# Cumulative empirical regret — one line per bandit algorithm
+# ---------------------------------------------------------------------------
+
+def _plot_cumulative_regret(evolution_by_group: list[dict], output_path: Path) -> str | None:
+    """Cumulative empirical regret per training epoch, one line per algorithm.
+    Regret_t = best_arm_rate * N_t - R_t  (hindsight-optimal arm from full history).
+    Lower and flatter is better — EXP3 has O(√T) theoretical guarantee."""
+    from matplotlib.ticker import MaxNLocator
+
+    train_groups = [
+        g for g in evolution_by_group
+        if g.get("policy_mode") == "rl_bandit"
+        and (g.get("experiment_split") or "") == "train"
+        and g.get("bandit_algorithm")
+        and g.get("benchmark")
+    ]
+    if not train_groups:
+        return None
+
+    benchmarks = sorted({str(g["benchmark"]) for g in train_groups})
+    if not benchmarks:
+        return None
+
+    combo_regret: dict[tuple[str, str], list[list[float]]] = defaultdict(list)
+
+    for group in train_groups:
+        bm = str(group["benchmark"])
+        alg = str(group["bandit_algorithm"])
+        runs = [r for r in group.get("runs", [])
+                if r.get("cumulative_reward_by_arm") and r.get("pulls_by_arm")]
+        if len(runs) < 2:
+            continue
+
+        # Identify hindsight-optimal arm from final epoch
+        final = runs[-1]
+        final_cum_r = final.get("cumulative_reward_by_arm") or {}
+        final_pulls = final.get("pulls_by_arm") or {}
+        arm_rates = {
+            arm: float(final_cum_r.get(arm, 0)) / float(p)
+            for arm, p in final_pulls.items()
+            if float(p) > 0
+        }
+        if not arm_rates:
+            continue
+        best_rate = max(arm_rates.values())
+
+        # Cumulative regret at each epoch checkpoint
+        regret_seq: list[float] = []
+        for run in runs:
+            cum_r = run.get("cumulative_reward_by_arm") or {}
+            cum_p = run.get("pulls_by_arm") or {}
+            N = sum(float(v) for v in cum_p.values())
+            R = sum(float(v) for v in cum_r.values())
+            regret_seq.append(max(0.0, best_rate * N - R))
+
+        if regret_seq:
+            combo_regret[(bm, alg)].append(regret_seq)
+
+    if not combo_regret:
+        return None
+
+    n_bm = len(benchmarks)
+    fig, axes = plt.subplots(1, n_bm, figsize=(6 * n_bm, 5),
+                             sharey=False, constrained_layout=True)
+    if n_bm == 1:
+        axes = [axes]
+
+    _N_CHECKPOINTS = 50  # subsample to this many evenly-spaced points for readability
+
+    for ax, bm in zip(axes, benchmarks):
+        for alg in ALGO_ORDER:
+            combos = combo_regret.get((bm, alg), [])
+            if not combos:
+                continue
+            min_len = min(len(c) for c in combos)
+            aligned = [c[:min_len] for c in combos]
+            means = [sum(c[i] for c in aligned) / len(aligned) for i in range(min_len)]
+            stds = [
+                sqrt(sum((c[i] - means[i]) ** 2 for c in aligned) / max(len(aligned) - 1, 1))
+                for i in range(min_len)
+            ]
+            # Subsample to at most _N_CHECKPOINTS evenly-spaced indices
+            step = max(1, min_len // _N_CHECKPOINTS)
+            idx = list(range(0, min_len, step))
+            epochs = [i + 1 for i in idx]
+            means_s = [means[i] for i in idx]
+            stds_s = [stds[i] for i in idx]
+            color = ALGO_COLORS.get(alg, "#9E9E9E")
+            ax.plot(epochs, means_s, linewidth=2, color=color,
+                    label=ALGO_DISPLAY.get(alg, alg))
+            ax.fill_between(
+                epochs,
+                [max(0.0, m - s) for m, s in zip(means_s, stds_s)],
+                [m + s for m, s in zip(means_s, stds_s)],
+                alpha=0.15, color=color,
+            )
+
+        ax.set_xlabel("Training epoch")
+        ax.set_ylabel("Cumulative empirical regret")
+        ax.set_title(bm.upper())
+        ax.set_ylim(bottom=0)
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.legend(loc="upper left", fontsize=8)
+
+    fig.suptitle("Cumulative Empirical Regret per Epoch — Bandit Algorithms",
+                 fontsize=13, fontweight="bold")
+    return _save_figure(fig, output_path)
+
+
+# ---------------------------------------------------------------------------
+# Train / validation / test ASR per algorithm (generalisation check)
+# ---------------------------------------------------------------------------
+
+def _plot_algo_split_comparison(run_rows: list[dict], output_path: Path) -> str | None:
+    """Grouped bar: train / validation / test ASR for each bandit algorithm.
+    Shows whether weights learned on the train split generalise to held-out splits."""
+    SPLITS_ORDER = ["train", "validation", "test"]
+    SPLIT_COLORS = {"train": "#42A5F5", "validation": "#FFA726", "test": "#66BB6A"}
+    SPLIT_LABELS = {"train": "Train", "validation": "Validation", "test": "Test"}
+
+    rows = [
+        r for r in run_rows
+        if r.get("policy_mode") == "rl_bandit"
+        and r.get("bandit_algorithm")
+        and (r.get("experiment_split") or "") in SPLITS_ORDER
+        and r.get("attack_success_rate") is not None
+    ]
+    if not rows:
+        return None
+
+    benchmarks = sorted({str(r.get("benchmark") or "") for r in rows if r.get("benchmark")})
+    if not benchmarks:
+        return None
+
+    n_bm = len(benchmarks)
+    fig, axes = plt.subplots(1, n_bm, figsize=(6 * n_bm, 5),
+                             sharey=False, constrained_layout=True)
+    if n_bm == 1:
+        axes = [axes]
+
+    for ax, bm in zip(axes, benchmarks):
+        bm_rows = [r for r in rows if (r.get("benchmark") or "") == bm]
+        algos_present = [a for a in ALGO_ORDER
+                         if any(r.get("bandit_algorithm") == a for r in bm_rows)]
+        if not algos_present:
+            continue
+
+        buckets: dict[tuple[str, str], list[float]] = defaultdict(list)
+        for row in bm_rows:
+            buckets[(str(row["bandit_algorithm"]), str(row["experiment_split"]))].append(
+                float(row["attack_success_rate"]) * 100
+            )
+
+        n_alg = len(algos_present)
+        bar_width = 0.8 / 3
+        x_pos = list(range(n_alg))
+        all_heights: list[float] = []
+
+        for si, split in enumerate(SPLITS_ORDER):
+            heights = []
+            for alg in algos_present:
+                vals = buckets.get((alg, split), [])
+                m = _mean(vals) or 0.0
+                heights.append(m)
+                all_heights.append(m)
+            offsets = [x + (si - 1) * bar_width for x in x_pos]
+            ax.bar(offsets, heights, width=bar_width,
+                   label=SPLIT_LABELS[split], color=SPLIT_COLORS[split], alpha=0.88)
+
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels([ALGO_DISPLAY.get(a, a) for a in algos_present], fontsize=10)
+        ax.set_ylabel("Attack Success Rate (%)")
+        ax.set_title(bm.upper())
+        valid = [h for h in all_heights if h > 0]
+        ax.set_ylim(0, min(105, max(valid) * 1.2 + 5) if valid else 100)
+        ax.legend(loc="upper right", fontsize=8)
+
+    fig.suptitle("Train / Validation / Test ASR per Bandit Algorithm",
+                 fontsize=13, fontweight="bold")
+    return _save_figure(fig, output_path)
+
+
+# ---------------------------------------------------------------------------
+# Per-tactic ASR across both datasets (transferability check)
+# ---------------------------------------------------------------------------
+
+def _plot_tactic_dataset_comparison(run_rows: list[dict], output_path: Path) -> str | None:
+    """Grouped bar: per-tactic win rate on each benchmark.
+    Shows whether tactic effectiveness transfers across bug types.
+    Uses success_by_arm / pulls_by_arm from all RL bandit runs."""
+    rows = [r for r in run_rows if r.get("policy_mode") == "rl_bandit"]
+    if not rows:
+        return None
+
+    benchmarks = sorted({str(r.get("benchmark") or "") for r in rows if r.get("benchmark")})
+    if len(benchmarks) < 2:
+        return None
+
+    BM_COLORS = [
+        "#1565C0", "#E65100", "#2E7D32", "#6A1B9A",
+    ]
+
+    arm_success: dict[tuple[str, str], float] = defaultdict(float)
+    arm_pulls: dict[tuple[str, str], float] = defaultdict(float)
+    for row in rows:
+        bm = str(row.get("benchmark") or "")
+        for arm_id, cnt in (row.get("success_by_arm") or {}).items():
+            arm_success[(str(arm_id), bm)] += float(cnt)
+        for arm_id, cnt in (row.get("pulls_by_arm") or {}).items():
+            arm_pulls[(str(arm_id), bm)] += float(cnt)
+
+    all_arms = sorted({k[0] for k in arm_pulls})
+    arms_with_data = [
+        a for a in all_arms
+        if any(arm_pulls.get((a, bm), 0) >= 5 for bm in benchmarks)
+    ]
+    if not arms_with_data:
+        return None
+
+    tactic_labels = [_clean_tactic_name(a) for a in arms_with_data]
+    n_arms = len(arms_with_data)
+    n_bm = len(benchmarks)
+    bar_width = 0.8 / n_bm
+    x_pos = list(range(n_arms))
+    all_heights: list[float] = []
+
+    fig, ax = plt.subplots(figsize=(max(9, n_arms * 1.4), 6), constrained_layout=True)
+
+    for bi, bm in enumerate(benchmarks):
+        heights: list[float] = []
+        for arm_id in arms_with_data:
+            pulls = arm_pulls.get((arm_id, bm), 0)
+            success = arm_success.get((arm_id, bm), 0)
+            heights.append((success / pulls * 100) if pulls >= 5 else 0.0)
+            all_heights.append(heights[-1])
+        offsets = [x + (bi - (n_bm - 1) / 2) * bar_width for x in x_pos]
+        ax.bar(offsets, heights, width=bar_width, label=bm.upper(),
+               color=BM_COLORS[bi % len(BM_COLORS)], alpha=0.88)
+
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(tactic_labels, rotation=20, ha="right", fontsize=9)
+    ax.set_ylabel("Attack Success Rate (%)")
+    ax.set_title("Tactic Effectiveness Across Datasets — RL Bandit")
+    valid = [h for h in all_heights if h > 0]
+    ax.set_ylim(0, min(105, max(valid) * 1.2 + 5) if valid else 100)
+    ax.legend(title="Dataset", loc="upper right")
+    return _save_figure(fig, output_path)
+
+
+# ---------------------------------------------------------------------------
+# LLM judge confidence distribution by policy
+# ---------------------------------------------------------------------------
+
+def _plot_confidence_distribution(run_rows: list[dict], output_path: Path) -> str | None:
+    """Box plot of mean LLM judge confidence per run, grouped by policy.
+    Uses run-level average_llm_confidence from run_summary.json.
+    Higher confidence = judge more convinced the (adversarially framed) code is correct."""
+    rows = [r for r in run_rows if r.get("average_llm_confidence") is not None]
+    if not rows:
+        return None
+
+    by_policy: dict[str, list[float]] = defaultdict(list)
+    for row in rows:
+        by_policy[_policy_label(row)].append(float(row["average_llm_confidence"]))
+
+    policy_order = sorted(by_policy.keys(), key=_policy_sort_key)
+    if not policy_order:
+        return None
+
+    data = [by_policy[p] for p in policy_order]
+    colors = [_policy_color(p) for p in policy_order]
+
+    fig, ax = plt.subplots(figsize=(max(7, len(policy_order) * 1.5), 6),
+                           constrained_layout=True)
+    bp = ax.boxplot(data, patch_artist=True, notch=False,
+                    medianprops={"color": "black", "linewidth": 2},
+                    flierprops={"marker": "o", "markersize": 4, "alpha": 0.5})
+    for patch, color in zip(bp["boxes"], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.75)
+
+    ax.set_xticks(range(1, len(policy_order) + 1))
+    ax.set_xticklabels(policy_order, rotation=15, ha="right", fontsize=10)
+    ax.set_ylabel("Mean LLM judge confidence (per run)")
+    ax.set_title("LLM Judge Confidence Distribution by Policy")
+    ax.set_ylim(0, 1.05)
+    ax.axhline(0.5, color="#aaa", linestyle="--", linewidth=1.2, label="Decision threshold (0.5)")
+    ax.legend(fontsize=8)
+    return _save_figure(fig, output_path)
+
+
+# ---------------------------------------------------------------------------
+# Cumulative ASR curve per iteration budget — key thesis figure
+# ---------------------------------------------------------------------------
+
+def _plot_cumulative_asr_curve(
+    run_rows: list[dict],
+    benchmark: str,
+    output_path: Path,
+) -> str | None:
+    """Cumulative ASR vs iteration budget (1–6), one line per policy.
+
+    Each point (X=N, Y=p) means: p% of test samples had their attack succeed
+    within N tactic attempts. Primary metric = 1-shot (X=1); 3-shot and 6-shot
+    are secondary convergence checkpoints.
+
+    For RL bandits, only frozen-weight test rows are included so the curve
+    reflects the trained policy, not the training run itself.
+    """
+    from matplotlib.ticker import MaxNLocator
+
+    SHOT_FIELDS = [
+        ("baseline_win", 0),
+        ("asr_1shot_win", 1),
+        ("asr_2shot_win", 2),
+        ("asr_3shot_win", 3),
+        ("asr_4shot_win", 4),
+        ("asr_5shot_win", 5),
+        ("asr_6shot_win", 6),
+    ]
+
+    bm_rows = [
+        r for r in run_rows
+        if (r.get("benchmark") or "").lower() == benchmark.lower()
+        and (r.get("experiment_split") or "") == "test"
+    ]
+    if not bm_rows:
+        return None
+
+    def _rows_for_label(label: str) -> list[dict]:
+        if label in ("Random", "ReAct"):
+            return [r for r in bm_rows if _policy_label(r) == label]
+        # RL algorithm label — use frozen-weight eval rows only
+        return [
+            r for r in bm_rows
+            if _policy_label(r) == label
+            and r.get("bandit_freeze_weights_effective") is True
+        ]
+
+    all_labels = sorted({_policy_label(r) for r in bm_rows}, key=_policy_sort_key)
+    if not all_labels:
+        return None
+
+    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+
+    has_data = False
+    for label in all_labels:
+        rows = _rows_for_label(label)
+        if not rows:
+            continue
+
+        xs, ys = [], []
+        for field, n in SHOT_FIELDS:
+            vals = [float(r[field]) for r in rows if r.get(field) is not None]
+            if vals:
+                xs.append(n)
+                ys.append(sum(vals) / len(vals) * 100)
+
+        if len(xs) < 2:
+            continue
+
+        color = _policy_color(label)
+        linestyle = "--" if label == "ReAct" else "-"
+        marker = "s" if label == "ReAct" else "o"
+        ax.plot(xs, ys, marker=marker, linewidth=2.2, linestyle=linestyle,
+                color=color, label=f"{label} (n={len(rows)})")
+        has_data = True
+
+    if not has_data:
+        plt.close(fig)
+        return None
+
+    ax.set_xlabel("Iteration budget (max tactic attempts)")
+    ax.set_ylabel("Cumulative ASR (%)")
+    ax.set_title(
+        f"Cumulative Attack Success Rate vs Iteration Budget\n"
+        f"Benchmark: {benchmark.upper()}, Test split"
+    )
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.set_xlim(left=0)
+    ax.set_ylim(0, 103)
+    ax.axvline(1, color="#888", linestyle=":", linewidth=1.2, label="1-shot (primary)")
+    ax.axvline(3, color="#bbb", linestyle=":", linewidth=1.0, label="3-shot")
+    ax.legend(loc="lower right", fontsize=9, ncol=2)
+    ax.grid(axis="y", linestyle="--", linewidth=0.5, alpha=0.6)
+    return _save_figure(fig, output_path)
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
@@ -1224,6 +1704,28 @@ def generate_plots(aggregation: dict, output_dir: str) -> dict:
     if result:
         generated_files.append(result)
 
+    # ---- New: RL training quality and generalisation figures ----------------
+
+    result = _plot_epoch_asr_curve(evolution_by_group, output_path / "epoch_asr_curve.png")
+    if result:
+        generated_files.append(result)
+
+    result = _plot_cumulative_regret(evolution_by_group, output_path / "cumulative_regret.png")
+    if result:
+        generated_files.append(result)
+
+    result = _plot_algo_split_comparison(run_rows, output_path / "algo_split_comparison.png")
+    if result:
+        generated_files.append(result)
+
+    result = _plot_tactic_dataset_comparison(run_rows, output_path / "tactic_dataset_comparison.png")
+    if result:
+        generated_files.append(result)
+
+    result = _plot_confidence_distribution(run_rows, output_path / "confidence_distribution.png")
+    if result:
+        generated_files.append(result)
+
     benchmarks_present = sorted({str(r.get("benchmark") or "") for r in run_rows if r.get("benchmark")})
     for bm in benchmarks_present:
         result = _plot_cross_model_heatmap(
@@ -1233,6 +1735,15 @@ def generate_plots(aggregation: dict, output_dir: str) -> dict:
 
         result = _plot_algorithm_judge_heatmap(
             run_rows, bm, output_path / f"algorithm_judge_heatmap_{_sanitize_filename(bm)}.png")
+        if result:
+            generated_files.append(result)
+
+    # ---- Cumulative ASR curve per iteration budget (key thesis figure) -------
+
+    for bm in benchmarks_present:
+        result = _plot_cumulative_asr_curve(
+            run_rows, bm,
+            output_path / f"cumulative_asr_curve_{_sanitize_filename(bm)}.png")
         if result:
             generated_files.append(result)
 

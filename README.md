@@ -62,7 +62,7 @@ All experiment commands use the `inspect eval` entrypoint with `PYTHONPATH=V3`.
 
 ```bash
 # macOS / Linux
-PYTHONPATH=V3 .venv/bin/inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+PYTHONPATH=V3 .venv/bin/inspect eval JESTER/adversarial_attack.py@adversarial_code_llm \
   --model ollama/llama3.1:8b \
   -T benchmark=adversarial_code_buggy \
   -T policy_mode=random_choice \
@@ -74,7 +74,7 @@ PYTHONPATH=V3 .venv/bin/inspect eval V3/adversarial_attack.py@adversarial_code_l
   --max-samples 1 --limit 1
 
 # Windows (Git Bash)
-PYTHONPATH=V3 .venv/Scripts/inspect eval V3/adversarial_attack.py@adversarial_code_llm \
+PYTHONPATH=V3 .venv/Scripts/inspect eval JESTER/adversarial_attack.py@adversarial_code_llm \
   --model ollama/llama3.1:8b \
   -T benchmark=adversarial_code_buggy \
   -T policy_mode=random_choice \
@@ -91,13 +91,13 @@ Smoke test passes when a new folder appears under `results/` with no Python exce
 **Helper scripts (recommended for full experiment runs):**
 
 ```bash
-bash V3/scripts/run_random.sh [adversarial_code_buggy|cubert_wbo]
-bash V3/scripts/run_react.sh  [adversarial_code_buggy|cubert_wbo]
+bash JESTER/scripts/run_random.sh [adversarial_code_buggy|cubert_wbo]
+bash JESTER/scripts/run_react.sh  [adversarial_code_buggy|cubert_wbo]
 
-EPOCHS=5 bash V3/scripts/run_rl_train.sh [adversarial_code_buggy|cubert_wbo]
-bash V3/scripts/run_rl_eval.sh           [adversarial_code_buggy|cubert_wbo]
+EPOCHS=3 bash JESTER/scripts/run_rl_train.sh [adversarial_code_buggy|cubert_wbo]
+bash JESTER/scripts/run_rl_eval.sh           [adversarial_code_buggy|cubert_wbo]
 
-bash V3/scripts/aggregate_and_plot.sh
+bash JESTER/scripts/aggregate_and_plot.sh
 ```
 
 All scripts accept env var overrides:
@@ -107,7 +107,7 @@ MODEL=ollama/tulu3:8b \
 JUDGE_MODEL=ollama/deepseek-coder:6.7b \
 BANDIT_ALGORITHM=thompson \
 WEIGHTS_PATH=weights/acb_thompson_tulu3_deepseek.json \
-bash V3/scripts/run_rl_train.sh adversarial_code_buggy
+bash JESTER/scripts/run_rl_train.sh adversarial_code_buggy
 ```
 
 See `RUNBOOK.txt` for the full ordered experiment checklist.
@@ -150,7 +150,7 @@ See `RUNBOOK.txt` for the full ordered experiment checklist.
 
 ## Tactics
 
-Nine tactics across six families defined in `V3/agent/tactic_registry.py`:
+Nine tactics across six families defined in `JESTER/agent/tactic_registry.py`:
 
 | Tactic ID | Family | Category |
 |-----------|--------|----------|
@@ -164,7 +164,7 @@ Nine tactics across six families defined in `V3/agent/tactic_registry.py`:
 | `taxonomy_recursion_crescendo` | recursion_crescendo | strategy_pacing |
 | `taxonomy_crowding` | crowding | obfuscation_noise |
 
-Tactic prompts are in `V3/prompts/tactic_generation.json`. Edit that file to change prompt text without touching Python.
+Tactic prompts are in `JESTER/prompts/tactic_generation.json`. Edit that file to change prompt text without touching Python.
 
 ## Reward signal
 
@@ -206,20 +206,20 @@ PYTHONPATH=V3 python -m pytest tests/ -v
 ## Key files
 
 ```
-V3/adversarial_attack.py          # Main Inspect task — benchmark loop and artifact lifecycle
-V3/agent/selector_policy.py       # SelectorPolicy protocol + RandomPolicy, ReactPolicy, RLBanditPolicy
-V3/agent/tactic_registry.py       # 9 tactics with tactic_id, family, renderer_binding
-V3/judge/llm_judge.py             # LLM judge wrapper
-V3/judge/red_teaming_tactics.py   # Renders tactics → review artifacts
-V3/utils/benchmark_loader.py      # All benchmark loaders
-V3/utils/reward_accounting.py     # Reward values and arm state
-V3/utils/results_persistence.py   # Writes run_config, run_summary, attempts.jsonl
-V3/prompts/tactic_generation.json # Tactic system prompts (edit here, not in Python)
-V3/scripts/run_random.sh          # Random choice baseline runner
-V3/scripts/run_react.sh           # ReAct agent runner
-V3/scripts/run_rl_train.sh        # Bandit training (UCB1 / Thompson / KL-UCB / EXP3)
-V3/scripts/run_rl_eval.sh         # Bandit evaluation with frozen weights
-V3/scripts/aggregate_and_plot.sh  # Aggregate results + generate plots + write resume files
+JESTER/adversarial_attack.py          # Main Inspect task — benchmark loop and artifact lifecycle
+JESTER/agent/selector_policy.py       # SelectorPolicy protocol + RandomPolicy, ReactPolicy, RLBanditPolicy
+JESTER/agent/tactic_registry.py       # 9 tactics with tactic_id, family, renderer_binding
+JESTER/judge/llm_judge.py             # LLM judge wrapper
+JESTER/judge/red_teaming_tactics.py   # Renders tactics → review artifacts
+JESTER/utils/benchmark_loader.py      # All benchmark loaders
+JESTER/utils/reward_accounting.py     # Reward values and arm state
+JESTER/utils/results_persistence.py   # Writes run_config, run_summary, attempts.jsonl
+JESTER/prompts/tactic_generation.json # Tactic system prompts (edit here, not in Python)
+JESTER/scripts/run_random.sh          # Random choice baseline runner
+JESTER/scripts/run_react.sh           # ReAct agent runner
+JESTER/scripts/run_rl_train.sh        # Bandit training (UCB1 / Thompson / KL-UCB / EXP3)
+JESTER/scripts/run_rl_eval.sh         # Bandit evaluation with frozen weights
+JESTER/scripts/aggregate_and_plot.sh  # Aggregate results + generate plots + write resume files
 datasets/                         # Pre-built JSONL datasets (adversarial_code_buggy, cubert_wbo, ...)
 weights/                          # Persisted bandit arm weights per (benchmark, algorithm, models)
 ```
