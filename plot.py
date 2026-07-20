@@ -41,6 +41,7 @@ plt.rcParams.update({
     "axes.spines.top": False,
     "axes.spines.right": False,
     "axes.grid": True,
+    "axes.axisbelow": True,          # grid and bars render beneath error bars
     "grid.alpha": 0.3,
     "grid.linestyle": "--",
     "figure.autolayout": False,
@@ -161,6 +162,20 @@ def _sanitize_filename(text: str) -> str:
 
 def _mean(values: list[float]) -> float | None:
     return (sum(values) / len(values)) if values else None
+
+
+def _binom_ci95(p: float, n: int) -> float:
+    """95% Wald binomial confidence-interval half-width for a proportion.
+
+    p is the success proportion in [0, 1]; n is the number of trials.
+    Returns the half-width in the same [0, 1] scale (multiply by 100 for pp).
+    This is the correct error bar for an attack-success-rate proportion, and
+    replaces the per-sample standard deviation used previously.
+    """
+    if n <= 0:
+        return 0.0
+    p = min(max(p, 0.0), 1.0)
+    return 1.96 * sqrt(p * (1.0 - p) / n)
 
 
 def _ensure_output_dir(output_dir: str | None) -> Path:
@@ -525,7 +540,7 @@ def _plot_policy_comparison_test(
         for bm in benchmarks:
             vals = buckets.get((bm, label), [])
             m = _mean(vals) or 0.0
-            e = (sqrt(sum((v - m) ** 2 for v in vals) / len(vals)) if len(vals) > 1 else 0.0)
+            e = _binom_ci95(m, len(vals))
             heights.append(m * 100)
             errs.append(e * 100)
             annots.append(f"{m * 100:.1f}%")
@@ -533,7 +548,7 @@ def _plot_policy_comparison_test(
         offsets = [x + (pi - (n_pol - 1) / 2) * bar_width for x in x_pos]
         color = _policy_color(label)
         bars = ax.bar(offsets, heights, width=bar_width, label=label, color=color, alpha=0.88,
-                      yerr=errs, capsize=4, error_kw={"elinewidth": 1.5, "ecolor": "#333"})
+                      yerr=errs, capsize=4, error_kw={"elinewidth": 1.5, "ecolor": "#333", "zorder": 6})
         for bar, ann in zip(bars, annots):
             h = bar.get_height()
             if h > 2:
@@ -597,7 +612,7 @@ def _plot_algorithm_comparison(run_rows: list[dict], output_path: Path) -> str |
         for bm in benchmarks:
             vals = buckets.get((bm, alg), [])
             m = _mean(vals) or 0.0
-            e = (sqrt(sum((v - m) ** 2 for v in vals) / len(vals)) if len(vals) > 1 else 0.0)
+            e = _binom_ci95(m, len(vals))
             heights.append(m * 100)
             errs.append(e * 100)
             annots.append(f"{m * 100:.1f}%")
@@ -606,7 +621,7 @@ def _plot_algorithm_comparison(run_rows: list[dict], output_path: Path) -> str |
         color = ALGO_COLORS.get(alg, "#9E9E9E")
         bars = ax.bar(offsets, heights, width=bar_width,
                       label=ALGO_DISPLAY.get(alg, alg), color=color, alpha=0.88,
-                      yerr=errs, capsize=4, error_kw={"elinewidth": 1.5, "ecolor": "#333"})
+                      yerr=errs, capsize=4, error_kw={"elinewidth": 1.5, "ecolor": "#333", "zorder": 6})
         for bar, ann in zip(bars, annots):
             h = bar.get_height()
             if h > 2:
@@ -881,7 +896,7 @@ def _plot_attacker_vs_judges(
             for jud in judges:
                 vals = buckets.get((jud, label), [])
                 m = _mean(vals) or 0.0
-                e = (sqrt(sum((v - m) ** 2 for v in vals) / len(vals)) if len(vals) > 1 else 0.0)
+                e = _binom_ci95(m, len(vals))
                 heights.append(m * 100)
                 errs.append(e * 100)
                 annots.append(f"{m * 100:.1f}%")
@@ -889,7 +904,7 @@ def _plot_attacker_vs_judges(
             offsets = [x + (pi - (n_pol - 1) / 2) * bar_width for x in x_pos]
             color = _policy_color(label)
             bars = ax.bar(offsets, heights, width=bar_width, label=label, color=color, alpha=0.88,
-                          yerr=errs, capsize=4, error_kw={"elinewidth": 1.5, "ecolor": "#333"})
+                          yerr=errs, capsize=4, error_kw={"elinewidth": 1.5, "ecolor": "#333", "zorder": 6})
             for bar, ann in zip(bars, annots):
                 h = bar.get_height()
                 if h > 2:
@@ -973,7 +988,7 @@ def _plot_iterations_by_judge(
             offsets = [x + (pi - (n_pol - 1) / 2) * bar_width for x in x_pos]
             color = _policy_color(label)
             bars = ax.bar(offsets, heights, width=bar_width, label=label, color=color, alpha=0.88,
-                          yerr=errs, capsize=4, error_kw={"elinewidth": 1.5, "ecolor": "#333"})
+                          yerr=errs, capsize=4, error_kw={"elinewidth": 1.5, "ecolor": "#333", "zorder": 6})
             for bar, h in zip(bars, heights):
                 if h > 0.05:
                     ax.text(bar.get_x() + bar.get_width() / 2, h + 0.05,

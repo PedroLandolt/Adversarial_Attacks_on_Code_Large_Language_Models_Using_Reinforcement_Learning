@@ -1,0 +1,962 @@
+[
+  {
+    "judge": "qwen",
+    "corpus": "adversarial_code_buggy",
+    "algo": "ucb1",
+    "n_samples": 687,
+    "train_baseline_winrate": 3.5,
+    "train_asr_1shot": 49.3,
+    "train_asr_6shot": 93.9,
+    "n_tactic_attempts": 1497,
+    "total_pulls_final": 1497,
+    "final_entropy_nats": 1.426,
+    "final_entropy_norm": 0.649,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 61.7,
+    "entropy_trajectory_norm": [
+      [
+        149,
+        0.945
+      ],
+      [
+        374,
+        0.874
+      ],
+      [
+        748,
+        0.756
+      ],
+      [
+        1122,
+        0.676
+      ],
+      [
+        1497,
+        0.649
+      ]
+    ],
+    "reward_early_third": 0.357,
+    "reward_late_third": 0.403,
+    "tactic_attempt_success_pct": 41.5
+  },
+  {
+    "judge": "qwen",
+    "corpus": "adversarial_code_buggy",
+    "algo": "thompson",
+    "n_samples": 687,
+    "train_baseline_winrate": 3.8,
+    "train_asr_1shot": 54.3,
+    "train_asr_6shot": 95.8,
+    "n_tactic_attempts": 1315,
+    "total_pulls_final": 1315,
+    "final_entropy_nats": 0.631,
+    "final_entropy_norm": 0.287,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 86.8,
+    "entropy_trajectory_norm": [
+      [
+        131,
+        0.729
+      ],
+      [
+        328,
+        0.628
+      ],
+      [
+        657,
+        0.451
+      ],
+      [
+        986,
+        0.35
+      ],
+      [
+        1315,
+        0.287
+      ]
+    ],
+    "reward_early_third": 0.397,
+    "reward_late_third": 0.559,
+    "tactic_attempt_success_pct": 48.1
+  },
+  {
+    "judge": "qwen",
+    "corpus": "adversarial_code_buggy",
+    "algo": "klucb",
+    "n_samples": 687,
+    "train_baseline_winrate": 3.8,
+    "train_asr_1shot": 48.3,
+    "train_asr_6shot": 94.0,
+    "n_tactic_attempts": 1522,
+    "total_pulls_final": 1522,
+    "final_entropy_nats": 1.365,
+    "final_entropy_norm": 0.621,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 64.3,
+    "entropy_trajectory_norm": [
+      [
+        152,
+        0.933
+      ],
+      [
+        380,
+        0.842
+      ],
+      [
+        761,
+        0.69
+      ],
+      [
+        1141,
+        0.669
+      ],
+      [
+        1522,
+        0.621
+      ]
+    ],
+    "reward_early_third": 0.387,
+    "reward_late_third": 0.404,
+    "tactic_attempt_success_pct": 40.7
+  },
+  {
+    "judge": "qwen",
+    "corpus": "adversarial_code_buggy",
+    "algo": "exp3",
+    "n_samples": 687,
+    "train_baseline_winrate": 3.8,
+    "train_asr_1shot": 29.7,
+    "train_asr_6shot": 83.7,
+    "n_tactic_attempts": 2053,
+    "total_pulls_final": 2053,
+    "final_entropy_nats": 2.098,
+    "final_entropy_norm": 0.955,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 23.8,
+    "entropy_trajectory_norm": [
+      [
+        205,
+        0.978
+      ],
+      [
+        513,
+        0.983
+      ],
+      [
+        1026,
+        0.989
+      ],
+      [
+        1539,
+        0.976
+      ],
+      [
+        2053,
+        0.955
+      ]
+    ],
+    "reward_early_third": 0.211,
+    "reward_late_third": 0.316,
+    "tactic_attempt_success_pct": 26.7
+  },
+  {
+    "judge": "qwen",
+    "corpus": "cubert_wbo",
+    "algo": "ucb1",
+    "n_samples": 700,
+    "train_baseline_winrate": 10.9,
+    "train_asr_1shot": 56.9,
+    "train_asr_6shot": 96.4,
+    "n_tactic_attempts": 1292,
+    "total_pulls_final": 1292,
+    "final_entropy_nats": 1.668,
+    "final_entropy_norm": 0.759,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 42.0,
+    "entropy_trajectory_norm": [
+      [
+        129,
+        0.985
+      ],
+      [
+        323,
+        0.909
+      ],
+      [
+        646,
+        0.852
+      ],
+      [
+        969,
+        0.783
+      ],
+      [
+        1292,
+        0.759
+      ]
+    ],
+    "reward_early_third": 0.437,
+    "reward_late_third": 0.502,
+    "tactic_attempt_success_pct": 46.4
+  },
+  {
+    "judge": "qwen",
+    "corpus": "cubert_wbo",
+    "algo": "thompson",
+    "n_samples": 700,
+    "train_baseline_winrate": 10.9,
+    "train_asr_1shot": 61.0,
+    "train_asr_6shot": 97.3,
+    "n_tactic_attempts": 1158,
+    "total_pulls_final": 1158,
+    "final_entropy_nats": 0.908,
+    "final_entropy_norm": 0.413,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 78.6,
+    "entropy_trajectory_norm": [
+      [
+        115,
+        0.894
+      ],
+      [
+        289,
+        0.816
+      ],
+      [
+        579,
+        0.572
+      ],
+      [
+        868,
+        0.485
+      ],
+      [
+        1158,
+        0.413
+      ]
+    ],
+    "reward_early_third": 0.456,
+    "reward_late_third": 0.573,
+    "tactic_attempt_success_pct": 52.2
+  },
+  {
+    "judge": "qwen",
+    "corpus": "cubert_wbo",
+    "algo": "klucb",
+    "n_samples": 700,
+    "train_baseline_winrate": 10.7,
+    "train_asr_1shot": 55.3,
+    "train_asr_6shot": 97.0,
+    "n_tactic_attempts": 1300,
+    "total_pulls_final": 1300,
+    "final_entropy_nats": 1.601,
+    "final_entropy_norm": 0.729,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 48.3,
+    "entropy_trajectory_norm": [
+      [
+        130,
+        0.974
+      ],
+      [
+        325,
+        0.902
+      ],
+      [
+        650,
+        0.844
+      ],
+      [
+        975,
+        0.75
+      ],
+      [
+        1300,
+        0.729
+      ]
+    ],
+    "reward_early_third": 0.42,
+    "reward_late_third": 0.425,
+    "tactic_attempt_success_pct": 46.5
+  },
+  {
+    "judge": "qwen",
+    "corpus": "cubert_wbo",
+    "algo": "exp3",
+    "n_samples": 700,
+    "train_baseline_winrate": 10.6,
+    "train_asr_1shot": 42.6,
+    "train_asr_6shot": 92.3,
+    "n_tactic_attempts": 1666,
+    "total_pulls_final": 1666,
+    "final_entropy_nats": 2.112,
+    "final_entropy_norm": 0.961,
+    "top_arm": "legacy_output",
+    "top_arm_share_pct": 17.0,
+    "entropy_trajectory_norm": [
+      [
+        166,
+        0.977
+      ],
+      [
+        416,
+        0.974
+      ],
+      [
+        833,
+        0.973
+      ],
+      [
+        1249,
+        0.97
+      ],
+      [
+        1666,
+        0.961
+      ]
+    ],
+    "reward_early_third": 0.31,
+    "reward_late_third": 0.387,
+    "tactic_attempt_success_pct": 34.3
+  },
+  {
+    "judge": "deepseek",
+    "corpus": "adversarial_code_buggy",
+    "algo": "ucb1",
+    "n_samples": 687,
+    "train_baseline_winrate": 9.6,
+    "train_asr_1shot": 65.6,
+    "train_asr_6shot": 98.3,
+    "n_tactic_attempts": 1051,
+    "total_pulls_final": 1051,
+    "final_entropy_nats": 1.774,
+    "final_entropy_norm": 0.807,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 31.6,
+    "entropy_trajectory_norm": [
+      [
+        105,
+        0.99
+      ],
+      [
+        262,
+        0.91
+      ],
+      [
+        525,
+        0.871
+      ],
+      [
+        788,
+        0.812
+      ],
+      [
+        1051,
+        0.807
+      ]
+    ],
+    "reward_early_third": 0.546,
+    "reward_late_third": 0.56,
+    "tactic_attempt_success_pct": 57.9
+  },
+  {
+    "judge": "deepseek",
+    "corpus": "adversarial_code_buggy",
+    "algo": "thompson",
+    "n_samples": 687,
+    "train_baseline_winrate": 8.3,
+    "train_asr_1shot": 70.7,
+    "train_asr_6shot": 99.4,
+    "n_tactic_attempts": 947,
+    "total_pulls_final": 947,
+    "final_entropy_nats": 0.972,
+    "final_entropy_norm": 0.442,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 73.7,
+    "entropy_trajectory_norm": [
+      [
+        94,
+        0.751
+      ],
+      [
+        236,
+        0.629
+      ],
+      [
+        473,
+        0.547
+      ],
+      [
+        710,
+        0.474
+      ],
+      [
+        947,
+        0.442
+      ]
+    ],
+    "reward_early_third": 0.667,
+    "reward_late_third": 0.619,
+    "tactic_attempt_success_pct": 66.1
+  },
+  {
+    "judge": "deepseek",
+    "corpus": "adversarial_code_buggy",
+    "algo": "klucb",
+    "n_samples": 687,
+    "train_baseline_winrate": 8.7,
+    "train_asr_1shot": 65.2,
+    "train_asr_6shot": 98.0,
+    "n_tactic_attempts": 1098,
+    "total_pulls_final": 1098,
+    "final_entropy_nats": 1.746,
+    "final_entropy_norm": 0.795,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 31.1,
+    "entropy_trajectory_norm": [
+      [
+        109,
+        0.939
+      ],
+      [
+        274,
+        0.857
+      ],
+      [
+        549,
+        0.872
+      ],
+      [
+        823,
+        0.832
+      ],
+      [
+        1098,
+        0.795
+      ]
+    ],
+    "reward_early_third": 0.536,
+    "reward_late_third": 0.557,
+    "tactic_attempt_success_pct": 55.8
+  },
+  {
+    "judge": "deepseek",
+    "corpus": "adversarial_code_buggy",
+    "algo": "exp3",
+    "n_samples": 687,
+    "train_baseline_winrate": 8.7,
+    "train_asr_1shot": 53.9,
+    "train_asr_6shot": 95.9,
+    "n_tactic_attempts": 1307,
+    "total_pulls_final": 1307,
+    "final_entropy_nats": 2.094,
+    "final_entropy_norm": 0.953,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 19.7,
+    "entropy_trajectory_norm": [
+      [
+        130,
+        0.982
+      ],
+      [
+        326,
+        0.986
+      ],
+      [
+        653,
+        0.983
+      ],
+      [
+        980,
+        0.969
+      ],
+      [
+        1307,
+        0.953
+      ]
+    ],
+    "reward_early_third": 0.4,
+    "reward_late_third": 0.51,
+    "tactic_attempt_success_pct": 45.8
+  },
+  {
+    "judge": "deepseek",
+    "corpus": "cubert_wbo",
+    "algo": "ucb1",
+    "n_samples": 700,
+    "train_baseline_winrate": 0.3,
+    "train_asr_1shot": 50.9,
+    "train_asr_6shot": 96.1,
+    "n_tactic_attempts": 1459,
+    "total_pulls_final": 1459,
+    "final_entropy_nats": 1.675,
+    "final_entropy_norm": 0.763,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 35.8,
+    "entropy_trajectory_norm": [
+      [
+        145,
+        0.965
+      ],
+      [
+        364,
+        0.935
+      ],
+      [
+        729,
+        0.878
+      ],
+      [
+        1094,
+        0.81
+      ],
+      [
+        1459,
+        0.763
+      ]
+    ],
+    "reward_early_third": 0.397,
+    "reward_late_third": 0.541,
+    "tactic_attempt_success_pct": 46.0
+  },
+  {
+    "judge": "deepseek",
+    "corpus": "cubert_wbo",
+    "algo": "thompson",
+    "n_samples": 700,
+    "train_baseline_winrate": 0.4,
+    "train_asr_1shot": 55.7,
+    "train_asr_6shot": 98.4,
+    "n_tactic_attempts": 1319,
+    "total_pulls_final": 1319,
+    "final_entropy_nats": 1.063,
+    "final_entropy_norm": 0.484,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 68.4,
+    "entropy_trajectory_norm": [
+      [
+        131,
+        0.797
+      ],
+      [
+        329,
+        0.74
+      ],
+      [
+        659,
+        0.647
+      ],
+      [
+        989,
+        0.533
+      ],
+      [
+        1319,
+        0.484
+      ]
+    ],
+    "reward_early_third": 0.483,
+    "reward_late_third": 0.535,
+    "tactic_attempt_success_pct": 52.0
+  },
+  {
+    "judge": "deepseek",
+    "corpus": "cubert_wbo",
+    "algo": "klucb",
+    "n_samples": 700,
+    "train_baseline_winrate": 0.3,
+    "train_asr_1shot": 50.1,
+    "train_asr_6shot": 95.6,
+    "n_tactic_attempts": 1465,
+    "total_pulls_final": 1465,
+    "final_entropy_nats": 1.578,
+    "final_entropy_norm": 0.718,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 46.0,
+    "entropy_trajectory_norm": [
+      [
+        146,
+        0.972
+      ],
+      [
+        366,
+        0.874
+      ],
+      [
+        732,
+        0.854
+      ],
+      [
+        1098,
+        0.784
+      ],
+      [
+        1465,
+        0.718
+      ]
+    ],
+    "reward_early_third": 0.402,
+    "reward_late_third": 0.525,
+    "tactic_attempt_success_pct": 45.5
+  },
+  {
+    "judge": "deepseek",
+    "corpus": "cubert_wbo",
+    "algo": "exp3",
+    "n_samples": 700,
+    "train_baseline_winrate": 0.3,
+    "train_asr_1shot": 45.9,
+    "train_asr_6shot": 94.4,
+    "n_tactic_attempts": 1578,
+    "total_pulls_final": 1578,
+    "final_entropy_nats": 1.905,
+    "final_entropy_norm": 0.867,
+    "top_arm": "legacy_injection",
+    "top_arm_share_pct": 34.9,
+    "entropy_trajectory_norm": [
+      [
+        157,
+        0.97
+      ],
+      [
+        394,
+        0.962
+      ],
+      [
+        789,
+        0.931
+      ],
+      [
+        1183,
+        0.902
+      ],
+      [
+        1578,
+        0.867
+      ]
+    ],
+    "reward_early_third": 0.329,
+    "reward_late_third": 0.471,
+    "tactic_attempt_success_pct": 41.8
+  },
+  {
+    "judge": "codellama",
+    "corpus": "adversarial_code_buggy",
+    "algo": "ucb1",
+    "n_samples": 687,
+    "train_baseline_winrate": 59.4,
+    "train_asr_1shot": 80.8,
+    "train_asr_6shot": 98.0,
+    "n_tactic_attempts": 570,
+    "total_pulls_final": 570,
+    "final_entropy_nats": 2.012,
+    "final_entropy_norm": 0.916,
+    "top_arm": "legacy_output",
+    "top_arm_share_pct": 21.9,
+    "entropy_trajectory_norm": [
+      [
+        57,
+        0.948
+      ],
+      [
+        142,
+        0.958
+      ],
+      [
+        285,
+        0.944
+      ],
+      [
+        427,
+        0.932
+      ],
+      [
+        570,
+        0.916
+      ]
+    ],
+    "reward_early_third": 0.389,
+    "reward_late_third": 0.474,
+    "tactic_attempt_success_pct": 46.5
+  },
+  {
+    "judge": "codellama",
+    "corpus": "adversarial_code_buggy",
+    "algo": "thompson",
+    "n_samples": 687,
+    "train_baseline_winrate": 59.1,
+    "train_asr_1shot": 85.2,
+    "train_asr_6shot": 98.5,
+    "n_tactic_attempts": 494,
+    "total_pulls_final": 494,
+    "final_entropy_nats": 1.497,
+    "final_entropy_norm": 0.681,
+    "top_arm": "legacy_semantic",
+    "top_arm_share_pct": 50.6,
+    "entropy_trajectory_norm": [
+      [
+        49,
+        0.948
+      ],
+      [
+        123,
+        0.907
+      ],
+      [
+        247,
+        0.796
+      ],
+      [
+        370,
+        0.706
+      ],
+      [
+        494,
+        0.681
+      ]
+    ],
+    "reward_early_third": 0.53,
+    "reward_late_third": 0.549,
+    "tactic_attempt_success_pct": 54.9
+  },
+  {
+    "judge": "codellama",
+    "corpus": "adversarial_code_buggy",
+    "algo": "klucb",
+    "n_samples": 687,
+    "train_baseline_winrate": 59.7,
+    "train_asr_1shot": 84.0,
+    "train_asr_6shot": 98.3,
+    "n_tactic_attempts": 515,
+    "total_pulls_final": 515,
+    "final_entropy_nats": 1.921,
+    "final_entropy_norm": 0.874,
+    "top_arm": "legacy_output",
+    "top_arm_share_pct": 27.6,
+    "entropy_trajectory_norm": [
+      [
+        51,
+        0.837
+      ],
+      [
+        128,
+        0.949
+      ],
+      [
+        257,
+        0.91
+      ],
+      [
+        386,
+        0.875
+      ],
+      [
+        515,
+        0.874
+      ]
+    ],
+    "reward_early_third": 0.48,
+    "reward_late_third": 0.474,
+    "tactic_attempt_success_pct": 51.5
+  },
+  {
+    "judge": "codellama",
+    "corpus": "adversarial_code_buggy",
+    "algo": "exp3",
+    "n_samples": 687,
+    "train_baseline_winrate": 60.7,
+    "train_asr_1shot": 78.9,
+    "train_asr_6shot": 96.8,
+    "n_tactic_attempts": 637,
+    "total_pulls_final": 637,
+    "final_entropy_nats": 2.151,
+    "final_entropy_norm": 0.979,
+    "top_arm": "taxonomy_appeal_to_authority",
+    "top_arm_share_pct": 18.4,
+    "entropy_trajectory_norm": [
+      [
+        63,
+        0.971
+      ],
+      [
+        159,
+        0.996
+      ],
+      [
+        318,
+        0.993
+      ],
+      [
+        477,
+        0.99
+      ],
+      [
+        637,
+        0.979
+      ]
+    ],
+    "reward_early_third": 0.373,
+    "reward_late_third": 0.377,
+    "tactic_attempt_success_pct": 38.9
+  },
+  {
+    "judge": "codellama",
+    "corpus": "cubert_wbo",
+    "algo": "ucb1",
+    "n_samples": 700,
+    "train_baseline_winrate": 1.6,
+    "train_asr_1shot": 68.7,
+    "train_asr_6shot": 99.7,
+    "n_tactic_attempts": 1016,
+    "total_pulls_final": 1016,
+    "final_entropy_nats": 1.799,
+    "final_entropy_norm": 0.819,
+    "top_arm": "legacy_semantic",
+    "top_arm_share_pct": 29.7,
+    "entropy_trajectory_norm": [
+      [
+        101,
+        0.97
+      ],
+      [
+        254,
+        0.935
+      ],
+      [
+        508,
+        0.886
+      ],
+      [
+        762,
+        0.851
+      ],
+      [
+        1016,
+        0.819
+      ]
+    ],
+    "reward_early_third": 0.642,
+    "reward_late_third": 0.695,
+    "tactic_attempt_success_pct": 67.6
+  },
+  {
+    "judge": "codellama",
+    "corpus": "cubert_wbo",
+    "algo": "thompson",
+    "n_samples": 700,
+    "train_baseline_winrate": 1.0,
+    "train_asr_1shot": 79.4,
+    "train_asr_6shot": 99.9,
+    "n_tactic_attempts": 894,
+    "total_pulls_final": 894,
+    "final_entropy_nats": 0.687,
+    "final_entropy_norm": 0.312,
+    "top_arm": "legacy_semantic",
+    "top_arm_share_pct": 85.0,
+    "entropy_trajectory_norm": [
+      [
+        89,
+        0.729
+      ],
+      [
+        223,
+        0.455
+      ],
+      [
+        447,
+        0.414
+      ],
+      [
+        670,
+        0.36
+      ],
+      [
+        894,
+        0.312
+      ]
+    ],
+    "reward_early_third": 0.768,
+    "reward_late_third": 0.775,
+    "tactic_attempt_success_pct": 77.4
+  },
+  {
+    "judge": "codellama",
+    "corpus": "cubert_wbo",
+    "algo": "klucb",
+    "n_samples": 700,
+    "train_baseline_winrate": 0.9,
+    "train_asr_1shot": 74.1,
+    "train_asr_6shot": 99.3,
+    "n_tactic_attempts": 977,
+    "total_pulls_final": 977,
+    "final_entropy_nats": 1.544,
+    "final_entropy_norm": 0.703,
+    "top_arm": "legacy_semantic",
+    "top_arm_share_pct": 40.1,
+    "entropy_trajectory_norm": [
+      [
+        97,
+        0.99
+      ],
+      [
+        244,
+        0.847
+      ],
+      [
+        488,
+        0.794
+      ],
+      [
+        732,
+        0.721
+      ],
+      [
+        977,
+        0.703
+      ]
+    ],
+    "reward_early_third": 0.625,
+    "reward_late_third": 0.714,
+    "tactic_attempt_success_pct": 70.5
+  },
+  {
+    "judge": "codellama",
+    "corpus": "cubert_wbo",
+    "algo": "exp3",
+    "n_samples": 700,
+    "train_baseline_winrate": 1.4,
+    "train_asr_1shot": 61.1,
+    "train_asr_6shot": 98.6,
+    "n_tactic_attempts": 1188,
+    "total_pulls_final": 1188,
+    "final_entropy_nats": 2.082,
+    "final_entropy_norm": 0.948,
+    "top_arm": "legacy_output",
+    "top_arm_share_pct": 24.4,
+    "entropy_trajectory_norm": [
+      [
+        118,
+        0.994
+      ],
+      [
+        297,
+        0.991
+      ],
+      [
+        594,
+        0.973
+      ],
+      [
+        891,
+        0.961
+      ],
+      [
+        1188,
+        0.948
+      ]
+    ],
+    "reward_early_third": 0.5,
+    "reward_late_third": 0.629,
+    "tactic_attempt_success_pct": 57.2
+  }
+]
