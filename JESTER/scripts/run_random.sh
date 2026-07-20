@@ -27,7 +27,7 @@ LOG="logs/experiment/random_$(date +%Y%m%d_%H%M%S).log"
 run() {
     local BM="$1"
     echo "[$(date '+%H:%M:%S')] random_choice — $BM (max_iter=$MAX_ITERATIONS)" | tee -a "$LOG"
-    PYTHONPATH=V3 "$INSPECT" eval JESTER/adversarial_attack.py@adversarial_code_llm \
+    "$INSPECT" eval JESTER/adversarial_attack.py@adversarial_code_llm \
         --model "$MODEL" \
         --max-samples 10 \
         --limit 1000 \

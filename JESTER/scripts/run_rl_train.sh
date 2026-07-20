@@ -50,7 +50,7 @@ train_benchmark() {
     echo "[$(date '+%H:%M:%S')] attacker (selector): $SELECTOR_MODEL  target (judge): $TARGET_MODEL  code gen (LLM): $MODEL" | tee -a "$LOG"
     echo "[$(date '+%H:%M:%S')] weights: $WEIGHTS_PATH" | tee -a "$LOG"
 
-    PYTHONPATH=V3 timeout "$EPOCH_TIMEOUT" "$INSPECT" eval JESTER/adversarial_attack.py@adversarial_code_llm \
+    timeout "$EPOCH_TIMEOUT" "$INSPECT" eval JESTER/adversarial_attack.py@adversarial_code_llm \
         --model "$MODEL" \
         --max-samples 10 \
         --limit 1000 \

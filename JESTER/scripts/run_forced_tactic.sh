@@ -37,23 +37,7 @@ wait_for_cool() {
 }
 
 mark_done() {
-    python3 - "$1" <<'PYEOF'
-import sys
-store_name = sys.argv[1]
-try:
-    with open('RUNBOOK.txt', 'r') as f:
-        lines = f.readlines()
-    new_lines = list(lines)
-    for i, line in enumerate(lines):
-        if '[ ]' in line and store_name in line:
-            new_lines[i] = line.replace('[ ]', '[X]', 1)
-            break
-    with open('RUNBOOK.txt', 'w') as f:
-        f.writelines(new_lines)
-except Exception:
-    pass
-print(f'Marked [X]: {store_name}')
-PYEOF
+    echo "[DONE] $1"
 }
 
 run_one() {
@@ -67,7 +51,7 @@ run_one() {
     echo "============================================================" | tee -a "$LOG"
     echo "[START] $store_name  --  $(date)" | tee -a "$LOG"
     echo "============================================================" | tee -a "$LOG"
-    PYTHONPATH=V3 "$INSPECT" eval JESTER/adversarial_attack.py@adversarial_code_llm \
+    "$INSPECT" eval JESTER/adversarial_attack.py@adversarial_code_llm \
         --model ollama/llama3.1:8b \
         --max-samples 10 \
         --limit 1000 \
